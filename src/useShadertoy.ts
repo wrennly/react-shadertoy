@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRenderer, dispose, render } from './renderer'
-import { bindTextures, disposeTextures, loadImageTexture } from './textures'
+import { bindTextures, createTexture, disposeTextures, updateDynamicTextures } from './textures'
 import type { MouseState, RendererState, TextureInputs, UseShadertoyOptions, UseShadertoyReturn } from './types'
 import { updateUniforms } from './uniforms'
 
@@ -54,10 +54,10 @@ export function useShadertoy({
     if (texturesProp) {
       for (let i = 0; i < 4; i++) {
         const src = texturesProp[CHANNEL_KEYS[i]]
-        if (typeof src === 'string') {
-          const { state, promise } = loadImageTexture(result.gl, src, i)
+        if (src != null) {
+          const { state, promise } = createTexture(result.gl, src, i)
           result.textures[i] = state
-          texturePromises.push(promise)
+          if (promise) texturePromises.push(promise)
         }
       }
     }
@@ -90,6 +90,7 @@ export function useShadertoy({
 
       if (!pausedRef.current && rendererRef.current) {
         const r = rendererRef.current
+        updateDynamicTextures(r.gl, r.textures)
         bindTextures(r.gl, r.locations.iChannel, r.textures)
         updateUniforms(r, delta, speedRef.current, mouseState.current)
         render(r)

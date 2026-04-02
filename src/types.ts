@@ -1,7 +1,11 @@
 import type { CSSProperties, RefObject } from 'react'
 
-/** Texture source: URL string for image loading */
-export type TextureSource = string
+/** Texture source: URL string, or an HTML element for dynamic textures */
+export type TextureSource =
+  | string
+  | HTMLImageElement
+  | HTMLVideoElement
+  | HTMLCanvasElement
 
 /** Texture inputs mapped to Shadertoy channels */
 export type TextureInputs = {
@@ -18,6 +22,10 @@ export interface TextureState {
   height: number
   unit: number
   loaded: boolean
+  /** True for video/canvas sources that need per-frame re-upload */
+  needsUpdate: boolean
+  /** Original source reference (for dynamic re-upload) */
+  source: TextureSource | null
 }
 
 export interface ShadertoyProps {

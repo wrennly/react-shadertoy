@@ -1,59 +1,161 @@
-import type { TextureState } from './types'
+import type { TextureSource, TextureState } from './types'
 
-/**
- * Load an image URL into a WebGL texture.
- * Creates a 1x1 placeholder immediately so the shader can render while loading.
- */
-export function loadImageTexture(
-  gl: WebGLRenderingContext,
-  url: string,
-  unit: number,
-): { state: TextureState; promise: Promise<void> } {
+function isPOT(v: number): boolean {
+  return (v & (v - 1)) === 0 && v > 0
+}
+
+function initTexture(gl: WebGLRenderingContext, unit: number): WebGLTexture {
   const texture = gl.createTexture()!
   gl.activeTexture(gl.TEXTURE0 + unit)
   gl.bindTexture(gl.TEXTURE_2D, texture)
-
-  // 1x1 placeholder (magenta — visible indicator that texture is loading)
-  gl.texImage2D(
-    gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
-    new Uint8Array([255, 0, 255, 255]),
-  )
-
-  // Default parameters (safe for NPOT)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+  return texture
+}
 
-  const state: TextureState = { texture, width: 1, height: 1, unit, loaded: false }
+function uploadElement(
+  gl: WebGLRenderingContext,
+  texture: WebGLTexture,
+  unit: number,
+  el: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement,
+): void {
+  gl.activeTexture(gl.TEXTURE0 + unit)
+  gl.bindTexture(gl.TEXTURE_2D, texture)
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, el)
+}
 
-  const promise = new Promise<void>((resolve, reject) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      // Guard: GL context may be lost if component unmounted during load
-      if (gl.isContextLost()) { resolve(); return }
+/**
+ * Create a texture from any supported source.
+ * - string (URL): returns async promise, shows magenta placeholder while loading
+ * - HTMLImageElement: uploads immediately if complete, else waits for load
+ * - HTMLVideoElement: uploads current frame, marks needsUpdate for per-frame re-upload
+ * - HTMLCanvasElement: uploads current content, marks needsUpdate for per-frame re-upload
+ */
+export function createTexture(
+  gl: WebGLRenderingContext,
+  source: TextureSource,
+  unit: number,
+): { state: TextureState; promise: Promise<void> | null } {
+  const texture = initTexture(gl, unit)
 
-      gl.activeTexture(gl.TEXTURE0 + unit)
-      gl.bindTexture(gl.TEXTURE_2D, texture)
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img)
+  // URL string — async load
+  if (typeof source === 'string') {
+    // Magenta placeholder
+    gl.texImage2D(
+      gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+      new Uint8Array([255, 0, 255, 255]),
+    )
 
-      // Generate mipmaps for POT textures
-      if (isPOT(img.width) && isPOT(img.height)) {
-        gl.generateMipmap(gl.TEXTURE_2D)
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
-      }
-
-      state.width = img.width
-      state.height = img.height
-      state.loaded = true
-      resolve()
+    const state: TextureState = {
+      texture, width: 1, height: 1, unit,
+      loaded: false, needsUpdate: false, source,
     }
-    img.onerror = () => reject(new Error(`Failed to load texture: ${url}`))
-    img.src = url
-  })
 
-  return { state, promise }
+    const promise = new Promise<void>((resolve, reject) => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        if (gl.isContextLost()) { resolve(); return }
+        uploadElement(gl, texture, unit, img)
+        if (isPOT(img.width) && isPOT(img.height)) {
+          gl.generateMipmap(gl.TEXTURE_2D)
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+        }
+        state.width = img.width
+        state.height = img.height
+        state.loaded = true
+        resolve()
+      }
+      img.onerror = () => reject(new Error(`Failed to load texture: ${source}`))
+      img.src = source
+    })
+
+    return { state, promise }
+  }
+
+  // HTMLImageElement — sync if already loaded, async if still loading
+  if (source instanceof HTMLImageElement) {
+    const state: TextureState = {
+      texture, width: source.naturalWidth || 1, height: source.naturalHeight || 1, unit,
+      loaded: source.complete, needsUpdate: false, source,
+    }
+
+    if (source.complete && source.naturalWidth > 0) {
+      uploadElement(gl, texture, unit, source)
+      state.width = source.naturalWidth
+      state.height = source.naturalHeight
+      return { state, promise: null }
+    }
+
+    const promise = new Promise<void>((resolve, reject) => {
+      source.onload = () => {
+        if (gl.isContextLost()) { resolve(); return }
+        uploadElement(gl, texture, unit, source)
+        state.width = source.naturalWidth
+        state.height = source.naturalHeight
+        state.loaded = true
+        resolve()
+      }
+      source.onerror = () => reject(new Error('Failed to load image element'))
+    })
+
+    return { state, promise }
+  }
+
+  // HTMLVideoElement — upload current frame, re-upload every frame
+  if (source instanceof HTMLVideoElement) {
+    const w = source.videoWidth || 1
+    const h = source.videoHeight || 1
+    if (source.readyState >= 2) {
+      uploadElement(gl, texture, unit, source)
+    } else {
+      gl.texImage2D(
+        gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+        new Uint8Array([0, 0, 0, 255]),
+      )
+    }
+
+    const state: TextureState = {
+      texture, width: w, height: h, unit,
+      loaded: source.readyState >= 2, needsUpdate: true, source,
+    }
+    return { state, promise: null }
+  }
+
+  // HTMLCanvasElement — upload current content, re-upload every frame
+  uploadElement(gl, texture, unit, source)
+  const state: TextureState = {
+    texture, width: source.width, height: source.height, unit,
+    loaded: true, needsUpdate: true, source,
+  }
+  return { state, promise: null }
+}
+
+/**
+ * Re-upload dynamic textures (video/canvas) each frame.
+ */
+export function updateDynamicTextures(
+  gl: WebGLRenderingContext,
+  textures: (TextureState | null)[],
+): void {
+  for (const tex of textures) {
+    if (!tex || !tex.needsUpdate || !tex.source) continue
+
+    if (tex.source instanceof HTMLVideoElement) {
+      const v = tex.source
+      if (v.readyState < 2) continue
+      uploadElement(gl, tex.texture, tex.unit, v)
+      tex.width = v.videoWidth
+      tex.height = v.videoHeight
+      tex.loaded = true
+    } else if (tex.source instanceof HTMLCanvasElement) {
+      uploadElement(gl, tex.texture, tex.unit, tex.source)
+      tex.width = tex.source.width
+      tex.height = tex.source.height
+    }
+  }
 }
 
 /**
@@ -85,8 +187,4 @@ export function disposeTextures(
   for (const tex of textures) {
     if (tex) gl.deleteTexture(tex.texture)
   }
-}
-
-function isPOT(v: number): boolean {
-  return (v & (v - 1)) === 0 && v > 0
 }
