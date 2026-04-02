@@ -47,6 +47,20 @@ export function updateUniforms(
     gl.uniform4f(locations.iMouse, mouse.x, mouse.y, mz, mw)
   }
 
+  // iChannelResolution — vec3[4] (width, height, 1.0) for each texture channel
+  if (locations.iChannelResolution) {
+    const res = new Float32Array(12) // 4 channels × 3 floats
+    for (let i = 0; i < 4; i++) {
+      const tex = state.textures[i]
+      if (tex) {
+        res[i * 3] = tex.width
+        res[i * 3 + 1] = tex.height
+        res[i * 3 + 2] = 1.0
+      }
+    }
+    gl.uniform3fv(locations.iChannelResolution, res)
+  }
+
   // iDate — vec4(year, month, day, seconds_since_midnight)
   if (locations.iDate) {
     const now = new Date()

@@ -29,6 +29,14 @@ uniform float iTimeDelta;
 uniform int   iFrame;
 uniform vec4  iMouse;
 uniform vec4  iDate;
+uniform sampler2D iChannel0;
+uniform sampler2D iChannel1;
+uniform sampler2D iChannel2;
+uniform sampler2D iChannel3;
+uniform vec3  iChannelResolution[4];
+
+// Shadertoy compatibility: texture() is GLSL 300 es, WebGL1 uses texture2D()
+#define texture texture2D
 
 ${shader}
 
@@ -116,6 +124,13 @@ export function createRenderer(
     iFrame: gl.getUniformLocation(program, 'iFrame'),
     iMouse: gl.getUniformLocation(program, 'iMouse'),
     iDate: gl.getUniformLocation(program, 'iDate'),
+    iChannel: [
+      gl.getUniformLocation(program, 'iChannel0'),
+      gl.getUniformLocation(program, 'iChannel1'),
+      gl.getUniformLocation(program, 'iChannel2'),
+      gl.getUniformLocation(program, 'iChannel3'),
+    ],
+    iChannelResolution: gl.getUniformLocation(program, 'iChannelResolution'),
   }
 
   gl.useProgram(program)
@@ -124,6 +139,7 @@ export function createRenderer(
     gl,
     program,
     locations,
+    textures: [null, null, null, null],
     time: 0,
     frame: 0,
     lastTime: 0,

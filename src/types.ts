@@ -1,8 +1,30 @@
 import type { CSSProperties, RefObject } from 'react'
 
+/** Texture source: URL string for image loading */
+export type TextureSource = string
+
+/** Texture inputs mapped to Shadertoy channels */
+export type TextureInputs = {
+  iChannel0?: TextureSource
+  iChannel1?: TextureSource
+  iChannel2?: TextureSource
+  iChannel3?: TextureSource
+}
+
+/** Internal texture state per channel */
+export interface TextureState {
+  texture: WebGLTexture
+  width: number
+  height: number
+  unit: number
+  loaded: boolean
+}
+
 export interface ShadertoyProps {
   /** Shadertoy-compatible GLSL fragment shader (must contain mainImage) */
   fragmentShader: string
+  /** Texture inputs for iChannel0-3 */
+  textures?: TextureInputs
   /** Container style */
   style?: CSSProperties
   /** Container className */
@@ -23,6 +45,7 @@ export interface ShadertoyProps {
 
 export interface UseShadertoyOptions {
   fragmentShader: string
+  textures?: TextureInputs
   paused?: boolean
   speed?: number
   pixelRatio?: number
@@ -54,12 +77,15 @@ export interface UniformLocations {
   iFrame: WebGLUniformLocation | null
   iMouse: WebGLUniformLocation | null
   iDate: WebGLUniformLocation | null
+  iChannel: (WebGLUniformLocation | null)[]
+  iChannelResolution: WebGLUniformLocation | null
 }
 
 export interface RendererState {
   gl: WebGLRenderingContext
   program: WebGLProgram
   locations: UniformLocations
+  textures: (TextureState | null)[]
   time: number
   frame: number
   lastTime: number

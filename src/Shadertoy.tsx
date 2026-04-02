@@ -3,6 +3,7 @@ import { useShadertoy } from './useShadertoy'
 
 export function Shadertoy({
   fragmentShader,
+  textures,
   style,
   className,
   paused,
@@ -14,6 +15,7 @@ export function Shadertoy({
 }: ShadertoyProps) {
   const { canvasRef } = useShadertoy({
     fragmentShader,
+    textures,
     paused,
     speed,
     pixelRatio,

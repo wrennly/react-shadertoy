@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRenderer, dispose, render } from './renderer'
-import type { MouseState, RendererState, UseShadertoyOptions, UseShadertoyReturn } from './types'
+import { bindTextures, disposeTextures, loadImageTexture } from './textures'
+import type { MouseState, RendererState, TextureInputs, UseShadertoyOptions, UseShadertoyReturn } from './types'
 import { updateUniforms } from './uniforms'
+
+const CHANNEL_KEYS: (keyof TextureInputs)[] = ['iChannel0', 'iChannel1', 'iChannel2', 'iChannel3']
 
 export function useShadertoy({
   fragmentShader,
+  textures: texturesProp,
   paused = false,
   speed = 1.0,
   pixelRatio,
@@ -44,9 +48,38 @@ export function useShadertoy({
     }
 
     rendererRef.current = result
-    setIsReady(true)
-    setError(null)
-    onLoad?.()
+
+    // Load textures
+    const texturePromises: Promise<void>[] = []
+    if (texturesProp) {
+      for (let i = 0; i < 4; i++) {
+        const src = texturesProp[CHANNEL_KEYS[i]]
+        if (typeof src === 'string') {
+          const { state, promise } = loadImageTexture(result.gl, src, i)
+          result.textures[i] = state
+          texturePromises.push(promise)
+        }
+      }
+    }
+
+    // Signal ready (immediately if no textures, after load if textures)
+    const markReady = () => {
+      setIsReady(true)
+      setError(null)
+      onLoad?.()
+    }
+
+    if (texturePromises.length > 0) {
+      Promise.all(texturePromises)
+        .then(() => { if (rendererRef.current) markReady() })
+        .catch((err) => {
+          const msg = err instanceof Error ? err.message : 'Texture load failed'
+          setError(msg)
+          onError?.(msg)
+        })
+    } else {
+      markReady()
+    }
 
     // Render loop
     let lastTimestamp = 0
@@ -56,8 +89,10 @@ export function useShadertoy({
       lastTimestamp = timestamp
 
       if (!pausedRef.current && rendererRef.current) {
-        updateUniforms(rendererRef.current, delta, speedRef.current, mouseState.current)
-        render(rendererRef.current)
+        const r = rendererRef.current
+        bindTextures(r.gl, r.locations.iChannel, r.textures)
+        updateUniforms(r, delta, speedRef.current, mouseState.current)
+        render(r)
       }
 
       rafRef.current = requestAnimationFrame(loop)
@@ -68,12 +103,13 @@ export function useShadertoy({
     return () => {
       cancelAnimationFrame(rafRef.current)
       if (rendererRef.current) {
+        disposeTextures(rendererRef.current.gl, rendererRef.current.textures)
         dispose(rendererRef.current)
         rendererRef.current = null
       }
       setIsReady(false)
     }
-  }, [fragmentShader, onError, onLoad])
+  }, [fragmentShader, texturesProp, onError, onLoad])
 
   // Canvas resize
   useEffect(() => {
