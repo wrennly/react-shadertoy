@@ -27,7 +27,14 @@ type ShaderEntry = {
   code?: string
   textures?: Record<string, string>
   passes?: MultipassConfig
+  // API mode
+  id?: string
+  apiKey?: string
 }
+
+// Read API key from URL params: ?apiKey=xxx
+const params = new URLSearchParams(location.search)
+const API_KEY = params.get('apiKey') || ''
 
 const shaders: Record<string, ShaderEntry> = {
   ...(RD_BUFFER_A && RD_IMAGE ? { 'Reaction Diffusion': { passes: {
@@ -40,6 +47,11 @@ const shaders: Record<string, ShaderEntry> = {
   ...(SPACE_JOCKEY ? { 'Space Jockey': { code: SPACE_JOCKEY } } : {}),
   ...(CYBERSPACE ? { 'Cyberspace': { code: CYBERSPACE } } : {}),
   ...(LIVING_SHABON ? { 'Living Shabon': { code: LIVING_SHABON } } : {}),
+  // API mode demos (need ?apiKey=xxx in URL)
+  ...(API_KEY ? {
+    'API: Seascape': { id: 'Ms2SD1', apiKey: API_KEY },
+    'API: Raymarching': { id: 'Xds3zN', apiKey: API_KEY },
+  } : {}),
 }
 
 function App() {
@@ -74,6 +86,8 @@ function App() {
         fragmentShader={shader.code}
         passes={shader.passes}
         textures={shader.textures as any}
+        id={shader.id}
+        apiKey={shader.apiKey}
         style={{ width: '100vw', height: '100vh' }}
         onError={(err) => console.error('GLSL ERROR:', err)}
       />

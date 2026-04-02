@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { apiToConfig, fetchShader, isSinglePass } from './api'
 import { createMultipassRenderer, disposeMultipass, renderMultipass, resizeFBOs } from './multipass'
 import { createRenderer, dispose, render } from './renderer'
 import { bindTextures, createTexture, disposeTextures, updateDynamicTextures } from './textures'
-import type { MouseState, PassState, RendererState, TextureInputs, UseShadertoyOptions, UseShadertoyReturn } from './types'
+import type { MouseState, MultipassConfig, PassState, RendererState, ShaderMeta, TextureInputs, UseShadertoyOptions, UseShadertoyReturn } from './types'
 import { updateUniforms } from './uniforms'
 
 const CHANNEL_KEYS: (keyof TextureInputs)[] = ['iChannel0', 'iChannel1', 'iChannel2', 'iChannel3']
@@ -11,13 +12,15 @@ export function useShadertoy({
   fragmentShader,
   passes: passesProp,
   textures: texturesProp,
+  id,
+  apiKey,
   paused = false,
   speed = 1.0,
   pixelRatio,
   mouse: mouseEnabled = true,
   onError,
   onLoad,
-}: UseShadertoyOptions): UseShadertoyReturn {
+}: UseShadertoyOptions): UseShadertoyReturn & { meta: ShaderMeta | null } {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const rendererRef = useRef<RendererState | null>(null)
   const multipassRef = useRef<PassState[] | null>(null)
@@ -27,6 +30,14 @@ export function useShadertoy({
 
   const [isReady, setIsReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [meta, setMeta] = useState<ShaderMeta | null>(null)
+
+  // Resolved config from API (or props)
+  const [resolved, setResolved] = useState<{
+    passes?: MultipassConfig
+    textures?: TextureInputs
+    fragmentShader?: string
+  } | null>(id ? null : { passes: passesProp, textures: texturesProp, fragmentShader })
 
   const mouseState = useRef<MouseState>({
     x: 0, y: 0,
@@ -34,21 +45,60 @@ export function useShadertoy({
     pressed: false,
   })
 
-  // Shared multipass state (time/frame)
   const sharedState = useRef({ time: 0, frame: 0 })
 
-  // Keep refs in sync
   pausedRef.current = paused
   speedRef.current = speed
 
-  const isMultipass = !!passesProp
+  // Fetch from Shadertoy API when id is provided
+  useEffect(() => {
+    if (!id) return
+    if (!apiKey) {
+      setError('apiKey is required when using id')
+      onError?.('apiKey is required when using id')
+      return
+    }
+
+    let cancelled = false
+    fetchShader(id, apiKey)
+      .then(shader => {
+        if (cancelled) return
+        const config = apiToConfig(shader)
+        setMeta(config.meta)
+
+        if (isSinglePass(config.passes)) {
+          // Single image pass — use fragmentShader mode
+          const imagePass = config.passes.Image!
+          setResolved({
+            fragmentShader: imagePass.code,
+            textures: config.textures,
+          })
+        } else {
+          setResolved({ passes: config.passes })
+        }
+      })
+      .catch(err => {
+        if (cancelled) return
+        const msg = err instanceof Error ? err.message : 'Failed to fetch shader'
+        setError(msg)
+        onError?.(msg)
+      })
+
+    return () => { cancelled = true }
+  }, [id, apiKey])
+
+  const effectivePasses = resolved?.passes
+  const effectiveTextures = resolved?.textures ?? texturesProp
+  const effectiveShader = resolved?.fragmentShader ?? fragmentShader
+  const isMultipass = !!effectivePasses
 
   // Initialize WebGL
   useEffect(() => {
+    if (id && !resolved) return // Still fetching from API
+
     const canvas = canvasRef.current
     if (!canvas) return
 
-    // Reset shared state
     sharedState.current = { time: 0, frame: 0 }
 
     const gl = canvas.getContext('webgl2', {
@@ -63,12 +113,11 @@ export function useShadertoy({
       return
     }
 
-    // Load external textures (for single-pass or multipass external inputs)
     const externalTextures: (import('./types').TextureState | null)[] = [null, null, null, null]
     const texturePromises: Promise<void>[] = []
-    if (texturesProp) {
+    if (effectiveTextures) {
       for (let i = 0; i < 4; i++) {
-        const src = texturesProp[CHANNEL_KEYS[i]]
+        const src = effectiveTextures[CHANNEL_KEYS[i]]
         if (src != null) {
           const { state, promise } = createTexture(gl, src, i)
           externalTextures[i] = state
@@ -89,8 +138,7 @@ export function useShadertoy({
     }
 
     if (isMultipass) {
-      // ── Multipass mode ──
-      const passResult = createMultipassRenderer(gl, passesProp!, externalTextures)
+      const passResult = createMultipassRenderer(gl, effectivePasses!, externalTextures)
       if (typeof passResult === 'string') {
         handleError(passResult)
         return
@@ -107,7 +155,6 @@ export function useShadertoy({
         markReady()
       }
 
-      // Render loop
       let lastTimestamp = 0
       const loop = (timestamp: number) => {
         const delta = lastTimestamp ? (timestamp - lastTimestamp) / 1000 : 0
@@ -133,8 +180,7 @@ export function useShadertoy({
         setIsReady(false)
       }
     } else {
-      // ── Single-pass mode ──
-      const shaderCode = fragmentShader || 'void mainImage(out vec4 c, in vec2 f){ c = vec4(0); }'
+      const shaderCode = effectiveShader || 'void mainImage(out vec4 c, in vec2 f){ c = vec4(0); }'
       const result = createRenderer(canvas, shaderCode)
       if (typeof result === 'string') {
         handleError(result)
@@ -153,7 +199,6 @@ export function useShadertoy({
         markReady()
       }
 
-      // Render loop
       let lastTimestamp = 0
       const loop = (timestamp: number) => {
         const delta = lastTimestamp ? (timestamp - lastTimestamp) / 1000 : 0
@@ -181,7 +226,7 @@ export function useShadertoy({
         setIsReady(false)
       }
     }
-  }, [fragmentShader, passesProp, texturesProp, onError, onLoad])
+  }, [effectiveShader, effectivePasses, effectiveTextures, resolved, onError, onLoad])
 
   // Canvas resize
   useEffect(() => {
@@ -276,5 +321,5 @@ export function useShadertoy({
   const pause = useCallback(() => { pausedRef.current = true }, [])
   const resume = useCallback(() => { pausedRef.current = false }, [])
 
-  return { canvasRef, isReady, error, pause, resume }
+  return { canvasRef, isReady, error, pause, resume, meta }
 }

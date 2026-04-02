@@ -76,6 +76,72 @@ export interface PassState {
   channelBindings: (TextureState | { passRef: PassName } | null)[]  // resolved per-channel
 }
 
+// ── Shadertoy API response types ──
+
+export interface ShadertoyApiSampler {
+  filter: string
+  wrap: string
+  vflip: string
+  srgb: string
+  internal: string
+}
+
+export interface ShadertoyApiInput {
+  id: number
+  src: string
+  ctype: string
+  channel: number
+  sampler: ShadertoyApiSampler
+  published: number
+}
+
+export interface ShadertoyApiOutput {
+  id: number
+  channel: number
+}
+
+export interface ShadertoyApiRenderPass {
+  inputs: ShadertoyApiInput[]
+  outputs: ShadertoyApiOutput[]
+  code: string
+  name: string
+  description: string
+  type: string
+}
+
+export interface ShadertoyApiInfo {
+  id: string
+  date: string
+  viewed: number
+  name: string
+  username: string
+  description: string
+  likes: number
+  published: number
+  flags: number
+  tags: string[]
+  hasliked: number
+}
+
+export interface ShadertoyApiShader {
+  ver: string
+  info: ShadertoyApiInfo
+  renderpass: ShadertoyApiRenderPass[]
+}
+
+export interface ShadertoyApiResponse {
+  Shader: ShadertoyApiShader
+  Error?: string
+}
+
+export interface ShaderMeta {
+  name: string
+  author: string
+  description: string
+  tags: string[]
+  license?: string
+}
+
 export interface ShadertoyProps {
   /** Shadertoy-compatible GLSL fragment shader (must contain mainImage) */
   fragmentShader?: string
@@ -83,6 +149,12 @@ export interface ShadertoyProps {
   passes?: MultipassConfig
   /** Texture inputs for iChannel0-3 (single-pass mode) */
   textures?: TextureInputs
+  /** Shadertoy shader ID — fetches shader from API */
+  id?: string
+  /** Shadertoy API key (required when using id) */
+  apiKey?: string
+  /** Show license/author overlay (default: true when using id) */
+  showLicense?: boolean
   /** Container style */
   style?: CSSProperties
   /** Container className */
@@ -105,6 +177,8 @@ export interface UseShadertoyOptions {
   fragmentShader?: string
   passes?: MultipassConfig
   textures?: TextureInputs
+  id?: string
+  apiKey?: string
   paused?: boolean
   speed?: number
   pixelRatio?: number
@@ -119,6 +193,7 @@ export interface UseShadertoyReturn {
   error: string | null
   pause: () => void
   resume: () => void
+  meta: ShaderMeta | null
 }
 
 export interface MouseState {

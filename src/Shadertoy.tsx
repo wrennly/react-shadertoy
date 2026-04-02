@@ -5,6 +5,9 @@ export function Shadertoy({
   fragmentShader,
   passes,
   textures,
+  id,
+  apiKey,
+  showLicense,
   style,
   className,
   paused,
@@ -14,10 +17,12 @@ export function Shadertoy({
   onError,
   onLoad,
 }: ShadertoyProps) {
-  const { canvasRef } = useShadertoy({
+  const { canvasRef, meta } = useShadertoy({
     fragmentShader,
     passes,
     textures,
+    id,
+    apiKey,
     paused,
     speed,
     pixelRatio,
@@ -25,6 +30,29 @@ export function Shadertoy({
     onError,
     onLoad,
   })
+
+  const shouldShowLicense = showLicense ?? !!id
+  const hasMeta = shouldShowLicense && meta
+
+  if (hasMeta) {
+    return (
+      <div style={{ position: 'relative', ...style }} className={className}>
+        <canvas
+          ref={canvasRef}
+          style={{ width: '100%', height: '100%', display: 'block' }}
+        />
+        <div style={{
+          position: 'absolute', bottom: 8, right: 8,
+          background: 'rgba(0,0,0,0.6)', color: '#fff',
+          padding: '4px 10px', borderRadius: 4,
+          fontSize: 12, fontFamily: 'system-ui, sans-serif',
+          pointerEvents: 'none',
+        }}>
+          <strong>{meta.name}</strong> by {meta.author}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <canvas
