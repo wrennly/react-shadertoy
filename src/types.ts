@@ -7,12 +7,26 @@ export type TextureSource =
   | HTMLVideoElement
   | HTMLCanvasElement
 
+export type TextureWrap = 'clamp' | 'repeat'
+export type TextureFilter = 'nearest' | 'linear' | 'mipmap'
+
+/** Advanced texture options with wrap/filter/vflip control */
+export interface TextureOptions {
+  src: TextureSource
+  wrap?: TextureWrap
+  filter?: TextureFilter
+  vflip?: boolean
+}
+
+/** A texture input: shorthand source or full options object */
+export type TextureInput = TextureSource | TextureOptions
+
 /** Texture inputs mapped to Shadertoy channels */
 export type TextureInputs = {
-  iChannel0?: TextureSource
-  iChannel1?: TextureSource
-  iChannel2?: TextureSource
-  iChannel3?: TextureSource
+  iChannel0?: TextureInput
+  iChannel1?: TextureInput
+  iChannel2?: TextureInput
+  iChannel3?: TextureInput
 }
 
 /** Internal texture state per channel */
