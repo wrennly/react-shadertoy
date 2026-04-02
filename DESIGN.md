@@ -2,7 +2,7 @@
 
 ## Overview
 
-ShadertoyのGLSLシェーダーをコピペでReactコンポーネントとして動かすライブラリ。
+A library that lets you run Shadertoy GLSL shaders as React components. Copy-paste and it works.
 
 ```tsx
 import { Shadertoy } from 'react-shadertoy'
@@ -15,83 +15,83 @@ import { Shadertoy } from 'react-shadertoy'
 `} />
 ```
 
-## コンセプト
+## Core Principles
 
-- **Shadertoyのコードがそのまま動く** — uniform名の変換不要
-- **React開発者が3行で使える** — WebGL/Three.jsの知識不要
-- **軽量** — 最小限の依存、バンドルサイズを小さく
+- **Shadertoy code works as-is** — no uniform renaming needed
+- **3 lines for React developers** — no WebGL/Three.js knowledge required
+- **Lightweight** — zero dependencies, minimal bundle size
 
-## Shadertoy 互換 Uniform
+## Shadertoy-Compatible Uniforms
 
-Shadertoyが提供する標準uniformをすべてマッピングする:
+Maps all standard Shadertoy uniforms:
 
-| Uniform | Type | 内容 |
+| Uniform | Type | Description |
 |---|---|---|
-| `iResolution` | `vec3` | ビューポートサイズ (px) |
-| `iTime` | `float` | 経過時間 (秒) |
-| `iTimeDelta` | `float` | 前フレームからの差分 (秒) |
-| `iFrame` | `int` | フレームカウンター |
-| `iMouse` | `vec4` | マウス座標 (xy: current, zw: click) |
-| `iDate` | `vec4` | 年月日秒 |
-| `iSampleRate` | `float` | オーディオサンプルレート |
-| `iChannelResolution[4]` | `vec3[]` | テクスチャ解像度 |
-| `iChannel0〜3` | `sampler2D` | テクスチャ入力 |
+| `iResolution` | `vec3` | Viewport size (px) |
+| `iTime` | `float` | Elapsed time (seconds) |
+| `iTimeDelta` | `float` | Delta since last frame (seconds) |
+| `iFrame` | `int` | Frame counter |
+| `iMouse` | `vec4` | Mouse position (xy: current, zw: click) |
+| `iDate` | `vec4` | Year, month, day, seconds since midnight |
+| `iSampleRate` | `float` | Audio sample rate |
+| `iChannelResolution[4]` | `vec3[]` | Texture resolutions |
+| `iChannel0-3` | `sampler2D` | Texture inputs |
 
-## API 設計
+## API Design
 
-### 基本（パターンA: コピペ）
+### Basic (Pattern A: Copy-Paste)
 
 ```tsx
 <Shadertoy
-  fragmentShader={glslString}    // 必須: Shadertoy GLSL コード
+  fragmentShader={glslString}    // Required: Shadertoy GLSL code
   style={{ width: '100%', height: '400px' }}
 />
 ```
 
-### オプション Props
+### Optional Props
 
 ```tsx
 <Shadertoy
   fragmentShader={glslString}
   
-  // テクスチャ
+  // Textures
   textures={{
-    iChannel0: '/texture.png',       // 画像URL
+    iChannel0: '/texture.png',       // Image URL
     iChannel1: videoElement,          // HTMLVideoElement
     iChannel2: canvasElement,         // HTMLCanvasElement
   }}
   
-  // 制御
-  paused={false}                     // 一時停止
-  speed={1.0}                        // 速度倍率
+  // Controls
+  paused={false}                     // Pause rendering
+  speed={1.0}                        // Time speed multiplier
   pixelRatio={window.devicePixelRatio}
   
-  // コールバック
-  onError={(error) => {}}            // GLSLコンパイルエラー
-  onLoad={() => {}}                  // 初期化完了
+  // Callbacks
+  onError={(error) => {}}            // GLSL compile error
+  onLoad={() => {}}                  // WebGL ready
   
-  // スタイル
+  // Styling
   className="my-shader"
   style={{ width: '100%', height: '100vh' }}
 />
 ```
 
-### API連携（パターンB: ID指定 — 将来実装）
+### API Integration (Pattern B: ID Lookup — Future)
 
 ```tsx
-// ビルド時にShadertoy APIからGLSL取得+キャッシュ
+// Fetches GLSL from Shadertoy API at build time + caches locally
 <Shadertoy id="MdX3zr" />
 ```
 
-※ 月1,500回API制限あり。ビルド時取得+ローカルキャッシュで回避。
-※ ライセンス表示機能が必要（CC BY-NC-SA 3.0がデフォルト）。
+Note: Shadertoy API is limited to 1,500 requests/month. Build-time fetch + local cache mitigates this.
+License display is required (default: CC BY-NC-SA 3.0).
 
 ### Hooks API
 
 ```tsx
 import { useShadertoy } from 'react-shadertoy'
 
-const { canvasRef, isReady, error, pause, resume, setUniform } = useShadertoy({
+const { canvasRef, isReady, error, pause, resume } = useShadertoy({
   fragmentShader: glslString,
   textures: { iChannel0: '/noise.png' },
 })
@@ -99,47 +99,44 @@ const { canvasRef, isReady, error, pause, resume, setUniform } = useShadertoy({
 return <canvas ref={canvasRef} />
 ```
 
-## レンダリングエンジンの選択
+## Rendering Engine
 
-### 案1: 素のWebGL（推奨）
-- **メリット**: 依存ゼロ、バンドル最小、インストールが軽い
-- **デメリット**: 自前でWebGLコンテキスト管理
-- **適合**: Shadertoyはフルスクリーンquad + fragment shaderなのでWebGLで十分
+### Option 1: Raw WebGL (chosen)
+- **Pros**: Zero dependencies, minimal bundle, lightweight install
+- **Cons**: Manual WebGL context management
+- **Fit**: Shadertoy is just a full-screen quad + fragment shader — WebGL is sufficient
 
-### 案2: Three.js / R3F
-- **メリット**: 既にエコシステムが大きい、shabon-fxと共通基盤
-- **デメリット**: Three.js (150KB+) が依存に入る、重い
-- **適合**: 3Dシーンが不要なのにThree.jsは過剰
+### Option 2: Three.js / R3F
+- **Pros**: Large ecosystem, shared foundation with shabon-fx
+- **Cons**: Three.js (150KB+) as dependency, heavy
+- **Fit**: Scene graph, camera, lights are all unnecessary — overkill
 
-### 結論: **素のWebGL**
-Shadertoyの描画は「フルスクリーンquad + fragment shader」だけ。
-Three.jsのシーングラフ、カメラ、ライトは一切不要。
-軽さがこのライブラリの価値の一つ。
+### Decision: **Raw WebGL**
+Shadertoy rendering is a full-screen quad + fragment shader. Nothing more.
+Three.js scene graph, camera, and lights are unnecessary.
+Lightness is a core value of this library.
 
-## プロジェクト構成
+## Project Structure
 
 ```
 react-shadertoy/
 ├── src/
-│   ├── index.ts              # エクスポート
-│   ├── Shadertoy.tsx          # メインコンポーネント
+│   ├── index.ts              # Barrel exports
+│   ├── Shadertoy.tsx          # Main component
 │   ├── useShadertoy.ts        # Hooks API
-│   ├── renderer.ts            # WebGLレンダラー（uniform mapping, render loop）
-│   ├── uniforms.ts            # Shadertoy uniform定義 + 更新ロジック
-│   ├── textures.ts            # iChannel テクスチャローダー
-│   └── types.ts               # TypeScript型定義
-├── tests/
+│   ├── renderer.ts            # WebGL renderer (uniform mapping, render loop)
+│   ├── uniforms.ts            # Shadertoy uniform definitions + per-frame updates
+│   └── types.ts               # TypeScript type definitions
 ├── examples/
-│   └── basic/                 # 最小サンプル（Vite）
+│   └── basic/                 # Minimal example (Vite)
 ├── package.json
 ├── tsconfig.json
-├── vite.config.ts             # ライブラリビルド
 ├── README.md
 ├── LICENSE                    # MIT
-└── DESIGN.md                  # このファイル
+└── DESIGN.md                  # This file
 ```
 
-## package.json（設計）
+## package.json
 
 ```json
 {
@@ -157,61 +154,61 @@ react-shadertoy/
 }
 ```
 
-**外部依存ゼロ。** React のみ peerDependency。
+**Zero external dependencies.** React only as peerDependency.
 
-## バンドルサイズ目標
+## Bundle Size
 
-| | 目標 |
-|---|---|
-| minified | < 10KB |
-| gzipped | < 4KB |
+| | Target | Actual |
+|---|---|---|
+| minified | < 10KB | 8.84 KB |
+| gzipped | < 4KB | **2.62 KB** |
 
-## 実装フェーズ
+## Implementation Phases
 
-### Phase 1: MVP
-- [ ] フルスクリーンquad WebGLレンダラー
-- [ ] Shadertoy標準uniform全マッピング（iResolution, iTime, iMouse等）
-- [ ] `<Shadertoy>` コンポーネント
-- [ ] `useShadertoy` フック
-- [ ] GLSLコンパイルエラーハンドリング
-- [ ] npm publish
+### Phase 1: MVP ✅
+- [x] Full-screen quad WebGL renderer
+- [x] All Shadertoy standard uniforms (iResolution, iTime, iMouse, etc.)
+- [x] `<Shadertoy>` component
+- [x] `useShadertoy` hook
+- [x] GLSL compile error handling
+- [x] npm publish
 
-### Phase 2: テクスチャ
-- [ ] iChannel0〜3 テクスチャ対応（画像/動画/canvas）
-- [ ] iChannelResolution 自動設定
+### Phase 2: Textures
+- [ ] iChannel0-3 texture support (image/video/canvas)
+- [ ] iChannelResolution auto-detection
 
-### Phase 3: 拡張
-- [ ] マルチパス（Buffer A〜D → Image）
-- [ ] Shadertoy API連携（ID指定 + ビルド時キャッシュ）
-- [ ] ライセンス情報表示
+### Phase 3: Advanced
+- [ ] Multipass (Buffer A-D → Image)
+- [ ] Shadertoy API integration (ID lookup + build-time cache)
+- [ ] License info display
 
-### Phase 4: エコシステム
-- [ ] Next.js / Vite / Remix テンプレート
+### Phase 4: Ecosystem
+- [ ] Next.js / Vite / Remix templates
 - [ ] Storybook integration
-- [ ] Shadertoyからのインポートガイド
+- [ ] Shadertoy import guide
 
-## 競合との差別化
+## Competitive Comparison
 
 | | react-shadertoy | shadertoy-react (dead) | react-shaders |
 |---|---|---|---|
-| メンテ | **アクティブ** | 2021年放棄 | 2023年放棄 |
-| 依存 | **ゼロ** | Three.js | 不明 |
-| Shadertoy互換 | **全uniform** | 基本のみ | 部分的 |
-| テクスチャ | iChannel0〜3 | なし | 不明 |
-| マルチパス | Phase 3 | なし | なし |
-| TypeScript | **フル対応** | なし | あり |
-| バンドル | **< 4KB gz** | 重い | 不明 |
+| Maintained | **Active** | Abandoned 2021 | Abandoned 2023 |
+| Dependencies | **Zero** | Three.js | Unknown |
+| Shadertoy compat | **All uniforms** | Basic only | Partial |
+| Textures | Phase 2 | None | Unknown |
+| Multipass | Phase 3 | None | None |
+| TypeScript | **Full support** | None | Yes |
+| Bundle | **< 3KB gz** | Heavy | Unknown |
 
-## shabon-fx との関係
+## Relationship with shabon-fx
 
 ```
-react-shadertoy  = 汎用ブリッジ（任意のShadertoy GLSL → React）
-shabon-fx        = 厳選エフェクト集（手作り、最適化済み、プロダクション品質）
+react-shadertoy  = Generic bridge (any Shadertoy GLSL → React)
+shabon-fx        = Curated effects (hand-crafted, optimized, production-quality)
 ```
 
-将来的に shabon-fx が react-shadertoy を内部で使う構成もあり得るが、
-現時点では独立。shabon-fx は Three.js/R3F ベース、react-shadertoy は素のWebGL。
+They are independent. shabon-fx uses Three.js/R3F, react-shadertoy uses raw WebGL.
+In the future, shabon-fx may use react-shadertoy internally.
 
 ---
 
-*2026-04-02 設計開始*
+*Started 2026-04-02 — Phase 1 shipped*
