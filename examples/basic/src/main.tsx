@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Shadertoy } from 'react-shadertoy'
+import type { MultipassConfig } from 'react-shadertoy'
 
 // Simple texture test: display iChannel0 with time-based distortion
 const TEXTURE_TEST = `
@@ -19,8 +20,20 @@ const LIVING_SHABON = await fetch('/test/living-shabon.glsl').then(r => r.text()
 const BUTTERFLY = await fetch('/test/butterfly.glsl').then(r => r.text()).catch(() => '')
 const SPACE_JOCKEY = await fetch('/test/space_jocky.glsl').then(r => r.text()).catch(() => '')
 const TUNNEL = await fetch('/test/tunnel.glsl').then(r => r.text()).catch(() => '')
+const RD_BUFFER_A = await fetch('/test/reaction-diffusion-bufferA.glsl').then(r => r.text()).catch(() => '')
+const RD_IMAGE = await fetch('/test/reaction-diffusion-image.glsl').then(r => r.text()).catch(() => '')
 
-const shaders: Record<string, { code: string; textures?: Record<string, string> }> = {
+type ShaderEntry = {
+  code?: string
+  textures?: Record<string, string>
+  passes?: MultipassConfig
+}
+
+const shaders: Record<string, ShaderEntry> = {
+  ...(RD_BUFFER_A && RD_IMAGE ? { 'Reaction Diffusion': { passes: {
+    BufferA: { code: RD_BUFFER_A, iChannel0: 'BufferA' },
+    Image: { code: RD_IMAGE, iChannel0: 'BufferA' },
+  } } } : {}),
   'Texture Test': { code: TEXTURE_TEST, textures: { iChannel0: '/gray-noise-256.png' } },
   ...(TUNNEL ? { 'Tunnel': { code: TUNNEL, textures: { iChannel0: '/gray-noise-256.png', iChannel1: '/gray-noise-256.png' } } } : {}),
   ...(BUTTERFLY ? { 'Butterfly': { code: BUTTERFLY, textures: { iChannel0: '/gray-noise-256.png', iChannel1: '/sky-256.png' } } } : {}),
@@ -38,7 +51,7 @@ function App() {
     <>
       <div style={{
         position: 'fixed', top: 12, left: 12, zIndex: 10,
-        display: 'flex', gap: 8,
+        display: 'flex', gap: 8, flexWrap: 'wrap',
       }}>
         {names.map(name => (
           <button
@@ -59,6 +72,7 @@ function App() {
       <Shadertoy
         key={active}
         fragmentShader={shader.code}
+        passes={shader.passes}
         textures={shader.textures as any}
         style={{ width: '100vw', height: '100vh' }}
         onError={(err) => console.error('GLSL ERROR:', err)}
