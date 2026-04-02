@@ -1,0 +1,53 @@
+{
+  "name": "react-shadertoy",
+  "version": "0.1.0",
+  "description": "Run Shadertoy GLSL shaders in React. Copy-paste and it works.",
+  "author": "Wrennly (https://github.com/wrennly)",
+  "license": "MIT",
+  "homepage": "https://github.com/wrennly/react-shadertoy",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wrennly/react-shadertoy"
+  },
+  "keywords": [
+    "react",
+    "shadertoy",
+    "glsl",
+    "webgl",
+    "shader",
+    "fragment-shader",
+    "creative-coding",
+    "generative-art",
+    "webgpu",
+    "three.js"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  }
+}
