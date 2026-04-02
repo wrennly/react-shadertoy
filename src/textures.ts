@@ -1,9 +1,5 @@
 import type { TextureFilter, TextureInput, TextureOptions, TextureSource, TextureState, TextureWrap } from './types'
 
-function isPOT(v: number): boolean {
-  return (v & (v - 1)) === 0 && v > 0
-}
-
 /** Normalize shorthand TextureInput → { src, wrap, filter, vflip } */
 export function normalizeTextureInput(input: TextureInput): TextureOptions {
   if (typeof input === 'object' && input !== null && 'src' in input) {
@@ -22,7 +18,7 @@ function resolveOptions(opts: TextureOptions): { src: TextureSource; wrap: Textu
   }
 }
 
-function initTexture(gl: WebGLRenderingContext, unit: number): WebGLTexture {
+function initTexture(gl: WebGL2RenderingContext, unit: number): WebGLTexture {
   const texture = gl.createTexture()!
   gl.activeTexture(gl.TEXTURE0 + unit)
   gl.bindTexture(gl.TEXTURE_2D, texture)
@@ -34,31 +30,21 @@ function initTexture(gl: WebGLRenderingContext, unit: number): WebGLTexture {
   return texture
 }
 
-/** Apply wrap/filter/vflip parameters. NPOT textures fall back to clamp/linear with warning. */
+/** Apply wrap/filter/vflip parameters. WebGL2 supports NPOT textures fully. */
 function applyTextureParameters(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   w: number, h: number,
   wrap: TextureWrap, filter: TextureFilter, vflip: boolean,
 ): void {
-  const pot = isPOT(w) && isPOT(h)
-
-  // vflip
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, vflip ? 1 : 0)
 
   // Wrap
-  if (wrap === 'repeat' && pot) {
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT)
-  } else {
-    if (wrap === 'repeat' && !pot) {
-      console.warn('[react-shadertoy] NPOT texture: repeat wrap requires power-of-two dimensions, falling back to clamp')
-    }
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-  }
+  const wrapMode = wrap === 'repeat' ? gl.REPEAT : gl.CLAMP_TO_EDGE
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapMode)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapMode)
 
   // Filter
-  if (filter === 'mipmap' && pot) {
+  if (filter === 'mipmap') {
     gl.generateMipmap(gl.TEXTURE_2D)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
@@ -66,19 +52,15 @@ function applyTextureParameters(
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
   } else {
-    if (filter === 'mipmap' && !pot) {
-      console.warn('[react-shadertoy] NPOT texture: mipmap requires power-of-two dimensions, falling back to linear')
-    }
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
   }
 
-  // Reset flip state
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0)
 }
 
 function uploadElement(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   texture: WebGLTexture,
   unit: number,
   el: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement,
@@ -96,7 +78,7 @@ function uploadElement(
  * - HTMLCanvasElement: uploads current content, marks needsUpdate for per-frame re-upload
  */
 export function createTexture(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   input: TextureInput,
   unit: number,
 ): { state: TextureState; promise: Promise<void> | null } {
@@ -202,7 +184,7 @@ export function createTexture(
  * Re-upload dynamic textures (video/canvas) each frame.
  */
 export function updateDynamicTextures(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   textures: (TextureState | null)[],
 ): void {
   for (const tex of textures) {
@@ -227,7 +209,7 @@ export function updateDynamicTextures(
  * Bind all active textures and set sampler uniforms.
  */
 export function bindTextures(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   locations: (WebGLUniformLocation | null)[],
   textures: (TextureState | null)[],
 ): void {
@@ -246,7 +228,7 @@ export function bindTextures(
  * Delete all WebGL textures.
  */
 export function disposeTextures(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   textures: (TextureState | null)[],
 ): void {
   for (const tex of textures) {

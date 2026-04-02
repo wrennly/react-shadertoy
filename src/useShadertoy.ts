@@ -51,13 +51,13 @@ export function useShadertoy({
     // Reset shared state
     sharedState.current = { time: 0, frame: 0 }
 
-    const gl = canvas.getContext('webgl', {
+    const gl = canvas.getContext('webgl2', {
       antialias: false,
       alpha: true,
       premultipliedAlpha: false,
     })
     if (!gl) {
-      const msg = 'WebGL not supported'
+      const msg = 'WebGL2 not supported'
       setError(msg)
       onError?.(msg)
       return
@@ -200,7 +200,7 @@ export function useShadertoy({
 
         // Resize multipass FBOs
         if (multipassRef.current) {
-          const gl = canvas.getContext('webgl')
+          const gl = canvas.getContext('webgl2')
           if (gl) resizeFBOs(gl, multipassRef.current, w, h)
         }
       }

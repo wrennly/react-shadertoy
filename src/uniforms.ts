@@ -5,7 +5,7 @@ import type { MouseState, RendererState, UniformLocations } from './types'
  * Used by both single-pass and multipass renderers.
  */
 export function setUniforms(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   locations: UniformLocations,
   time: number, delta: number,
   frame: number,

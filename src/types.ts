@@ -141,7 +141,7 @@ export interface UniformLocations {
 }
 
 export interface RendererState {
-  gl: WebGLRenderingContext
+  gl: WebGL2RenderingContext
   program: WebGLProgram
   locations: UniformLocations
   textures: (TextureState | null)[]

@@ -12,7 +12,7 @@ function isPassName(v: PassInput): v is PassName {
 }
 
 function createPingPongTextures(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   w: number, h: number,
 ): [WebGLTexture, WebGLTexture] {
   const textures: WebGLTexture[] = []
@@ -30,7 +30,7 @@ function createPingPongTextures(
 }
 
 function createFBO(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   texture: WebGLTexture,
 ): WebGLFramebuffer {
   const fbo = gl.createFramebuffer()!
@@ -44,7 +44,7 @@ function createFBO(
  * Initialize multipass renderer. Compiles all pass programs, creates FBOs.
  */
 export function createMultipassRenderer(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   config: MultipassConfig,
   externalTextures: (TextureState | null)[],
 ): PassState[] | string {
@@ -96,7 +96,7 @@ export function createMultipassRenderer(
  * Render one multipass frame. Executes passes in order: BufferA → BufferD → Image.
  */
 export function renderMultipass(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   passes: PassState[],
   delta: number, speed: number, mouse: MouseState,
   sharedState: { time: number; frame: number },
@@ -191,7 +191,7 @@ export function renderMultipass(
  * Resize all buffer FBOs.
  */
 export function resizeFBOs(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   passes: PassState[],
   w: number, h: number,
 ): void {
@@ -211,7 +211,7 @@ export function resizeFBOs(
  * Clean up all multipass resources.
  */
 export function disposeMultipass(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   passes: PassState[],
 ): void {
   for (const pass of passes) {

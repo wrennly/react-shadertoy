@@ -10,14 +10,17 @@ const QUAD_VERTICES = new Float32Array([
    1,  1,
 ])
 
-export const VERTEX_SHADER = `
-attribute vec2 position;
+export const VERTEX_SHADER = `#version 300 es
+in vec2 position;
 void main() {
   gl_Position = vec4(position, 0.0, 1.0);
 }
 `
 
-export const FRAGMENT_PREAMBLE = `precision highp float;
+export const FRAGMENT_PREAMBLE = `#version 300 es
+precision highp float;
+
+out vec4 _fragColor;
 
 uniform vec3  iResolution;
 uniform float iTime;
@@ -31,8 +34,8 @@ uniform sampler2D iChannel2;
 uniform sampler2D iChannel3;
 uniform vec3  iChannelResolution[4];
 
-// Shadertoy compatibility: texture() is GLSL 300 es, WebGL1 uses texture2D()
-#define texture texture2D
+// Shadertoy compat: older shaders may use texture2D()
+#define texture2D texture
 
 `
 
@@ -43,13 +46,14 @@ export function wrapFragmentShader(shader: string): string {
   return FRAGMENT_PREAMBLE + shader + `
 
 void main() {
-  mainImage(gl_FragColor, gl_FragCoord.xy);
+  mainImage(_fragColor, gl_FragCoord.xy);
+  _fragColor.a = 1.0;
 }
 `
 }
 
 export function compileShader(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   type: number,
   source: string,
 ): WebGLShader | string {
@@ -72,7 +76,7 @@ export function compileShader(
  * Compile + link a shader program. Returns program or error string.
  */
 export function createProgram(
-  gl: WebGLRenderingContext,
+  gl: WebGL2RenderingContext,
   fragmentShader: string,
 ): WebGLProgram | string {
   const vert = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER)
@@ -102,7 +106,7 @@ export function createProgram(
 /**
  * Get all standard Shadertoy uniform locations from a program.
  */
-export function getUniformLocations(gl: WebGLRenderingContext, program: WebGLProgram): UniformLocations {
+export function getUniformLocations(gl: WebGL2RenderingContext, program: WebGLProgram): UniformLocations {
   return {
     iResolution: gl.getUniformLocation(program, 'iResolution'),
     iTime: gl.getUniformLocation(program, 'iTime'),
@@ -123,7 +127,7 @@ export function getUniformLocations(gl: WebGLRenderingContext, program: WebGLPro
 /**
  * Setup the shared full-screen quad buffer.
  */
-export function setupQuad(gl: WebGLRenderingContext, program: WebGLProgram): void {
+export function setupQuad(gl: WebGL2RenderingContext, program: WebGLProgram): void {
   const buffer = gl.createBuffer()
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
   gl.bufferData(gl.ARRAY_BUFFER, QUAD_VERTICES, gl.STATIC_DRAW)
@@ -140,12 +144,12 @@ export function createRenderer(
   canvas: HTMLCanvasElement,
   fragmentShader: string,
 ): RendererState | string {
-  const gl = canvas.getContext('webgl', {
+  const gl = canvas.getContext('webgl2', {
     antialias: false,
     alpha: true,
     premultipliedAlpha: false,
   })
-  if (!gl) return 'WebGL not supported'
+  if (!gl) return 'WebGL2 not supported'
 
   const program = createProgram(gl, fragmentShader)
   if (typeof program === 'string') return program

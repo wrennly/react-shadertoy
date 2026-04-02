@@ -17,10 +17,14 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 const CYBERSPACE = await fetch('/test/cyberspace.glsl').then(r => r.text()).catch(() => '')
 const LIVING_SHABON = await fetch('/test/living-shabon.glsl').then(r => r.text()).catch(() => '')
 const BUTTERFLY = await fetch('/test/butterfly.glsl').then(r => r.text()).catch(() => '')
+const SPACE_JOCKEY = await fetch('/test/space_jocky.glsl').then(r => r.text()).catch(() => '')
+const TUNNEL = await fetch('/test/tunnel.glsl').then(r => r.text()).catch(() => '')
 
 const shaders: Record<string, { code: string; textures?: Record<string, string> }> = {
   'Texture Test': { code: TEXTURE_TEST, textures: { iChannel0: '/gray-noise-256.png' } },
+  ...(TUNNEL ? { 'Tunnel': { code: TUNNEL, textures: { iChannel0: '/gray-noise-256.png', iChannel1: '/gray-noise-256.png' } } } : {}),
   ...(BUTTERFLY ? { 'Butterfly': { code: BUTTERFLY, textures: { iChannel0: '/gray-noise-256.png', iChannel1: '/sky-256.png' } } } : {}),
+  ...(SPACE_JOCKEY ? { 'Space Jockey': { code: SPACE_JOCKEY } } : {}),
   ...(CYBERSPACE ? { 'Cyberspace': { code: CYBERSPACE } } : {}),
   ...(LIVING_SHABON ? { 'Living Shabon': { code: LIVING_SHABON } } : {}),
 }
@@ -57,6 +61,7 @@ function App() {
         fragmentShader={shader.code}
         textures={shader.textures as any}
         style={{ width: '100vw', height: '100vh' }}
+        onError={(err) => console.error('GLSL ERROR:', err)}
       />
     </>
   )
