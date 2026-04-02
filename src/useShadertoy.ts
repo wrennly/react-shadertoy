@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createMultipassRenderer, disposeMultipass, renderMultipass, resizeFBOs } from './multipass'
 import { createRenderer, dispose, render } from './renderer'
 import { bindTextures, createTexture, disposeTextures, updateDynamicTextures } from './textures'
-import type { MouseState, RendererState, TextureInputs, UseShadertoyOptions, UseShadertoyReturn } from './types'
+import type { MouseState, PassState, RendererState, TextureInputs, UseShadertoyOptions, UseShadertoyReturn } from './types'
 import { updateUniforms } from './uniforms'
 
 const CHANNEL_KEYS: (keyof TextureInputs)[] = ['iChannel0', 'iChannel1', 'iChannel2', 'iChannel3']
 
 export function useShadertoy({
   fragmentShader,
+  passes: passesProp,
   textures: texturesProp,
   paused = false,
   speed = 1.0,
@@ -18,6 +20,7 @@ export function useShadertoy({
 }: UseShadertoyOptions): UseShadertoyReturn {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const rendererRef = useRef<RendererState | null>(null)
+  const multipassRef = useRef<PassState[] | null>(null)
   const rafRef = useRef<number>(0)
   const pausedRef = useRef(paused)
   const speedRef = useRef(speed)
@@ -31,86 +34,154 @@ export function useShadertoy({
     pressed: false,
   })
 
+  // Shared multipass state (time/frame)
+  const sharedState = useRef({ time: 0, frame: 0 })
+
   // Keep refs in sync
   pausedRef.current = paused
   speedRef.current = speed
+
+  const isMultipass = !!passesProp
 
   // Initialize WebGL
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const result = createRenderer(canvas, fragmentShader)
-    if (typeof result === 'string') {
-      setError(result)
-      onError?.(result)
+    // Reset shared state
+    sharedState.current = { time: 0, frame: 0 }
+
+    const gl = canvas.getContext('webgl', {
+      antialias: false,
+      alpha: true,
+      premultipliedAlpha: false,
+    })
+    if (!gl) {
+      const msg = 'WebGL not supported'
+      setError(msg)
+      onError?.(msg)
       return
     }
 
-    rendererRef.current = result
-
-    // Load textures
+    // Load external textures (for single-pass or multipass external inputs)
+    const externalTextures: (import('./types').TextureState | null)[] = [null, null, null, null]
     const texturePromises: Promise<void>[] = []
     if (texturesProp) {
       for (let i = 0; i < 4; i++) {
         const src = texturesProp[CHANNEL_KEYS[i]]
         if (src != null) {
-          const { state, promise } = createTexture(result.gl, src, i)
-          result.textures[i] = state
+          const { state, promise } = createTexture(gl, src, i)
+          externalTextures[i] = state
           if (promise) texturePromises.push(promise)
         }
       }
     }
 
-    // Signal ready (immediately if no textures, after load if textures)
     const markReady = () => {
       setIsReady(true)
       setError(null)
       onLoad?.()
     }
 
-    if (texturePromises.length > 0) {
-      Promise.all(texturePromises)
-        .then(() => { if (rendererRef.current) markReady() })
-        .catch((err) => {
-          const msg = err instanceof Error ? err.message : 'Texture load failed'
-          setError(msg)
-          onError?.(msg)
-        })
-    } else {
-      markReady()
+    const handleError = (msg: string) => {
+      setError(msg)
+      onError?.(msg)
     }
 
-    // Render loop
-    let lastTimestamp = 0
-
-    const loop = (timestamp: number) => {
-      const delta = lastTimestamp ? (timestamp - lastTimestamp) / 1000 : 0
-      lastTimestamp = timestamp
-
-      if (!pausedRef.current && rendererRef.current) {
-        const r = rendererRef.current
-        updateDynamicTextures(r.gl, r.textures)
-        bindTextures(r.gl, r.locations.iChannel, r.textures)
-        updateUniforms(r, delta, speedRef.current, mouseState.current)
-        render(r)
+    if (isMultipass) {
+      // ── Multipass mode ──
+      const passResult = createMultipassRenderer(gl, passesProp!, externalTextures)
+      if (typeof passResult === 'string') {
+        handleError(passResult)
+        return
       }
 
+      multipassRef.current = passResult
+      rendererRef.current = null
+
+      if (texturePromises.length > 0) {
+        Promise.all(texturePromises)
+          .then(() => { if (multipassRef.current) markReady() })
+          .catch((err) => handleError(err instanceof Error ? err.message : 'Texture load failed'))
+      } else {
+        markReady()
+      }
+
+      // Render loop
+      let lastTimestamp = 0
+      const loop = (timestamp: number) => {
+        const delta = lastTimestamp ? (timestamp - lastTimestamp) / 1000 : 0
+        lastTimestamp = timestamp
+
+        if (!pausedRef.current && multipassRef.current) {
+          updateDynamicTextures(gl, externalTextures)
+          renderMultipass(gl, multipassRef.current, delta, speedRef.current, mouseState.current, sharedState.current)
+        }
+
+        rafRef.current = requestAnimationFrame(loop)
+      }
       rafRef.current = requestAnimationFrame(loop)
-    }
 
-    rafRef.current = requestAnimationFrame(loop)
-
-    return () => {
-      cancelAnimationFrame(rafRef.current)
-      if (rendererRef.current) {
-        disposeTextures(rendererRef.current.gl, rendererRef.current.textures)
-        dispose(rendererRef.current)
-        rendererRef.current = null
+      return () => {
+        cancelAnimationFrame(rafRef.current)
+        if (multipassRef.current) {
+          disposeMultipass(gl, multipassRef.current)
+          multipassRef.current = null
+        }
+        disposeTextures(gl, externalTextures)
+        gl.getExtension('WEBGL_lose_context')?.loseContext()
+        setIsReady(false)
       }
-      setIsReady(false)
+    } else {
+      // ── Single-pass mode ──
+      const shaderCode = fragmentShader || 'void mainImage(out vec4 c, in vec2 f){ c = vec4(0); }'
+      const result = createRenderer(canvas, shaderCode)
+      if (typeof result === 'string') {
+        handleError(result)
+        return
+      }
+
+      rendererRef.current = result
+      multipassRef.current = null
+      result.textures = externalTextures
+
+      if (texturePromises.length > 0) {
+        Promise.all(texturePromises)
+          .then(() => { if (rendererRef.current) markReady() })
+          .catch((err) => handleError(err instanceof Error ? err.message : 'Texture load failed'))
+      } else {
+        markReady()
+      }
+
+      // Render loop
+      let lastTimestamp = 0
+      const loop = (timestamp: number) => {
+        const delta = lastTimestamp ? (timestamp - lastTimestamp) / 1000 : 0
+        lastTimestamp = timestamp
+
+        if (!pausedRef.current && rendererRef.current) {
+          const r = rendererRef.current
+          updateDynamicTextures(r.gl, r.textures)
+          bindTextures(r.gl, r.locations.iChannel, r.textures)
+          updateUniforms(r, delta, speedRef.current, mouseState.current)
+          render(r)
+        }
+
+        rafRef.current = requestAnimationFrame(loop)
+      }
+      rafRef.current = requestAnimationFrame(loop)
+
+      return () => {
+        cancelAnimationFrame(rafRef.current)
+        if (rendererRef.current) {
+          disposeTextures(rendererRef.current.gl, rendererRef.current.textures)
+          dispose(rendererRef.current)
+          rendererRef.current = null
+        }
+        setIsReady(false)
+      }
     }
-  }, [fragmentShader, texturesProp, onError, onLoad])
+  }, [fragmentShader, passesProp, texturesProp, onError, onLoad])
 
   // Canvas resize
   useEffect(() => {
@@ -122,8 +193,16 @@ export function useShadertoy({
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect
-        canvas.width = Math.round(width * dpr)
-        canvas.height = Math.round(height * dpr)
+        const w = Math.round(width * dpr)
+        const h = Math.round(height * dpr)
+        canvas.width = w
+        canvas.height = h
+
+        // Resize multipass FBOs
+        if (multipassRef.current) {
+          const gl = canvas.getContext('webgl')
+          if (gl) resizeFBOs(gl, multipassRef.current, w, h)
+        }
       }
     })
 

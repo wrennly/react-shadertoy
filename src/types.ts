@@ -42,10 +42,46 @@ export interface TextureState {
   source: TextureSource | null
 }
 
+// ── Multipass types ──
+
+export type PassName = 'BufferA' | 'BufferB' | 'BufferC' | 'BufferD' | 'Image'
+
+/** A channel input for a multipass pass: external texture or another pass name */
+export type PassInput = TextureInput | PassName
+
+/** Configuration for a single render pass */
+export interface PassConfig {
+  code: string
+  iChannel0?: PassInput
+  iChannel1?: PassInput
+  iChannel2?: PassInput
+  iChannel3?: PassInput
+}
+
+/** Multipass configuration: Buffer A-D + Image */
+export type MultipassConfig = {
+  [K in PassName]?: PassConfig
+}
+
+/** Internal state for a single render pass */
+export interface PassState {
+  name: PassName
+  program: WebGLProgram
+  locations: UniformLocations
+  fbo: WebGLFramebuffer | null       // null for Image (renders to screen)
+  pingPong: [WebGLTexture, WebGLTexture] | null  // null for Image
+  currentIdx: number                  // which ping-pong texture is current output
+  width: number
+  height: number
+  channelBindings: (TextureState | { passRef: PassName } | null)[]  // resolved per-channel
+}
+
 export interface ShadertoyProps {
   /** Shadertoy-compatible GLSL fragment shader (must contain mainImage) */
-  fragmentShader: string
-  /** Texture inputs for iChannel0-3 */
+  fragmentShader?: string
+  /** Multipass configuration (Buffer A-D + Image) */
+  passes?: MultipassConfig
+  /** Texture inputs for iChannel0-3 (single-pass mode) */
   textures?: TextureInputs
   /** Container style */
   style?: CSSProperties
@@ -66,7 +102,8 @@ export interface ShadertoyProps {
 }
 
 export interface UseShadertoyOptions {
-  fragmentShader: string
+  fragmentShader?: string
+  passes?: MultipassConfig
   textures?: TextureInputs
   paused?: boolean
   speed?: number

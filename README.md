@@ -4,9 +4,10 @@ Run [Shadertoy](https://www.shadertoy.com/) GLSL shaders in React. Copy-paste an
 
 - Zero dependencies (just React)
 - All Shadertoy uniforms supported (`iTime`, `iResolution`, `iMouse`, `iDate`, etc.)
+- iChannel0-3 textures (image URL, video, canvas)
+- Multipass rendering (Buffer A-D → Image)
 - Mouse & touch interaction built-in
 - TypeScript-first
-- < 4KB gzipped
 
 ## Install
 

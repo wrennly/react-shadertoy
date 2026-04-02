@@ -19,7 +19,7 @@ import { Shadertoy } from 'react-shadertoy'
 
 - **Shadertoy code works as-is** — no uniform renaming needed
 - **3 lines for React developers** — no WebGL/Three.js knowledge required
-- **Lightweight** — zero dependencies, minimal bundle size
+- **Lightweight** — zero dependencies, raw WebGL
 
 ## Shadertoy-Compatible Uniforms
 
@@ -156,13 +156,6 @@ react-shadertoy/
 
 **Zero external dependencies.** React only as peerDependency.
 
-## Bundle Size
-
-| | Target | Actual |
-|---|---|---|
-| minified | < 10KB | 8.84 KB |
-| gzipped | < 4KB | **2.62 KB** |
-
 ## Implementation Phases
 
 ### Phase 1: MVP ✅
@@ -173,12 +166,15 @@ react-shadertoy/
 - [x] GLSL compile error handling
 - [x] npm publish
 
-### Phase 2: Textures
-- [ ] iChannel0-3 texture support (image/video/canvas)
-- [ ] iChannelResolution auto-detection
+### Phase 2: Textures ✅
+- [x] iChannel0-3 image texture support (URL string)
+- [x] Dynamic textures (HTMLVideoElement, HTMLCanvasElement, HTMLImageElement)
+- [x] Texture options (wrap, filter, vflip) with NPOT fallback
+- [x] iChannelResolution auto-detection
+- [x] `texture()` → `texture2D()` compatibility shim
 
-### Phase 3: Advanced
-- [ ] Multipass (Buffer A-D → Image)
+### Phase 3: Advanced (in progress)
+- [x] Multipass (Buffer A-D → Image) with FBO + ping-pong
 - [ ] Shadertoy API integration (ID lookup + build-time cache)
 - [ ] License info display
 
@@ -193,11 +189,10 @@ react-shadertoy/
 |---|---|---|---|
 | Maintained | **Active** | Abandoned 2021 | Abandoned 2023 |
 | Dependencies | **Zero** | Three.js | Unknown |
-| Shadertoy compat | **All uniforms** | Basic only | Partial |
-| Textures | Phase 2 | None | Unknown |
-| Multipass | Phase 3 | None | None |
+| Shadertoy compat | **All uniforms + textures + multipass** | Basic only | Partial |
+| Textures | **image/video/canvas + options** | None | Unknown |
+| Multipass | **Buffer A-D + ping-pong** | None | None |
 | TypeScript | **Full support** | None | Yes |
-| Bundle | **< 3KB gz** | Heavy | Unknown |
 
 ## Relationship with shabon-fx
 

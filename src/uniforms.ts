@@ -1,7 +1,43 @@
-import type { MouseState, RendererState } from './types'
+import type { MouseState, RendererState, UniformLocations } from './types'
 
 /**
- * Update all Shadertoy standard uniforms for one frame.
+ * Set all Shadertoy standard uniforms for a given set of parameters.
+ * Used by both single-pass and multipass renderers.
+ */
+export function setUniforms(
+  gl: WebGLRenderingContext,
+  locations: UniformLocations,
+  time: number, delta: number,
+  frame: number,
+  width: number, height: number,
+  mouse: MouseState,
+  channelRes?: Float32Array,
+): void {
+  if (locations.iTime) gl.uniform1f(locations.iTime, time)
+  if (locations.iTimeDelta) gl.uniform1f(locations.iTimeDelta, delta)
+  if (locations.iFrame) gl.uniform1i(locations.iFrame, frame)
+  if (locations.iResolution) gl.uniform3f(locations.iResolution, width, height, 1.0)
+
+  if (locations.iMouse) {
+    const mz = mouse.pressed ? mouse.clickX : -Math.abs(mouse.clickX)
+    const mw = mouse.pressed ? mouse.clickY : -Math.abs(mouse.clickY)
+    gl.uniform4f(locations.iMouse, mouse.x, mouse.y, mz, mw)
+  }
+
+  if (locations.iChannelResolution && channelRes) {
+    gl.uniform3fv(locations.iChannelResolution, channelRes)
+  }
+
+  if (locations.iDate) {
+    const now = new Date()
+    const seconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds() + now.getMilliseconds() / 1000
+    gl.uniform4f(locations.iDate, now.getFullYear(), now.getMonth(), now.getDate(), seconds)
+  }
+}
+
+/**
+ * Update all Shadertoy standard uniforms for one frame (single-pass mode).
+ * Increments time and frame on the state object.
  */
 export function updateUniforms(
   state: RendererState,
@@ -9,69 +45,24 @@ export function updateUniforms(
   speed: number,
   mouse: MouseState,
 ): void {
-  const { gl, locations } = state
-
-  // iTime
   state.time += delta * speed
-  if (locations.iTime) {
-    gl.uniform1f(locations.iTime, state.time)
-  }
-
-  // iTimeDelta
-  if (locations.iTimeDelta) {
-    gl.uniform1f(locations.iTimeDelta, delta)
-  }
-
-  // iFrame
   state.frame++
-  if (locations.iFrame) {
-    gl.uniform1i(locations.iFrame, state.frame)
-  }
 
-  // iResolution
-  if (locations.iResolution) {
-    gl.uniform3f(
-      locations.iResolution,
-      gl.drawingBufferWidth,
-      gl.drawingBufferHeight,
-      1.0,
-    )
-  }
-
-  // iMouse — Shadertoy convention:
-  //   xy: current position (if pressed)
-  //   zw: click position (positive when pressed, negative when released)
-  if (locations.iMouse) {
-    const mz = mouse.pressed ? mouse.clickX : -Math.abs(mouse.clickX)
-    const mw = mouse.pressed ? mouse.clickY : -Math.abs(mouse.clickY)
-    gl.uniform4f(locations.iMouse, mouse.x, mouse.y, mz, mw)
-  }
-
-  // iChannelResolution — vec3[4] (width, height, 1.0) for each texture channel
-  if (locations.iChannelResolution) {
-    const res = new Float32Array(12) // 4 channels × 3 floats
-    for (let i = 0; i < 4; i++) {
-      const tex = state.textures[i]
-      if (tex) {
-        res[i * 3] = tex.width
-        res[i * 3 + 1] = tex.height
-        res[i * 3 + 2] = 1.0
-      }
+  // Build channel resolution array
+  const res = new Float32Array(12)
+  for (let i = 0; i < 4; i++) {
+    const tex = state.textures[i]
+    if (tex) {
+      res[i * 3] = tex.width
+      res[i * 3 + 1] = tex.height
+      res[i * 3 + 2] = 1.0
     }
-    gl.uniform3fv(locations.iChannelResolution, res)
   }
 
-  // iDate — vec4(year, month, day, seconds_since_midnight)
-  if (locations.iDate) {
-    const now = new Date()
-    const seconds =
-      now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds() + now.getMilliseconds() / 1000
-    gl.uniform4f(
-      locations.iDate,
-      now.getFullYear(),
-      now.getMonth(), // 0-based, matches Shadertoy
-      now.getDate(),
-      seconds,
-    )
-  }
+  setUniforms(
+    state.gl, state.locations,
+    state.time, delta, state.frame,
+    state.gl.drawingBufferWidth, state.gl.drawingBufferHeight,
+    mouse, res,
+  )
 }

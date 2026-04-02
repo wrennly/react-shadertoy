@@ -10,18 +10,14 @@ const QUAD_VERTICES = new Float32Array([
    1,  1,
 ])
 
-const VERTEX_SHADER = `
+export const VERTEX_SHADER = `
 attribute vec2 position;
 void main() {
   gl_Position = vec4(position, 0.0, 1.0);
 }
 `
 
-/**
- * Wrap Shadertoy GLSL: prepend uniform declarations + main() bridge.
- */
-function wrapFragmentShader(shader: string): string {
-  return `precision highp float;
+export const FRAGMENT_PREAMBLE = `precision highp float;
 
 uniform vec3  iResolution;
 uniform float iTime;
@@ -38,7 +34,13 @@ uniform vec3  iChannelResolution[4];
 // Shadertoy compatibility: texture() is GLSL 300 es, WebGL1 uses texture2D()
 #define texture texture2D
 
-${shader}
+`
+
+/**
+ * Wrap Shadertoy GLSL: prepend uniform declarations + main() bridge.
+ */
+export function wrapFragmentShader(shader: string): string {
+  return FRAGMENT_PREAMBLE + shader + `
 
 void main() {
   mainImage(gl_FragColor, gl_FragCoord.xy);
@@ -46,7 +48,7 @@ void main() {
 `
 }
 
-function compileShader(
+export function compileShader(
   gl: WebGLRenderingContext,
   type: number,
   source: string,
@@ -67,29 +69,18 @@ function compileShader(
 }
 
 /**
- * Initialize WebGL: compile shaders, link program, setup quad.
- * Returns RendererState on success or error string on failure.
+ * Compile + link a shader program. Returns program or error string.
  */
-export function createRenderer(
-  canvas: HTMLCanvasElement,
+export function createProgram(
+  gl: WebGLRenderingContext,
   fragmentShader: string,
-): RendererState | string {
-  const gl = canvas.getContext('webgl', {
-    antialias: false,
-    alpha: true,
-    premultipliedAlpha: false,
-  })
-  if (!gl) return 'WebGL not supported'
-
-  // Compile vertex shader
+): WebGLProgram | string {
   const vert = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER)
   if (typeof vert === 'string') return vert
 
-  // Compile fragment shader (wrapped)
   const frag = compileShader(gl, gl.FRAGMENT_SHADER, wrapFragmentShader(fragmentShader))
   if (typeof frag === 'string') return frag
 
-  // Link program
   const program = gl.createProgram()
   if (!program) return 'Failed to create program'
 
@@ -103,21 +94,16 @@ export function createRenderer(
     return log
   }
 
-  // Clean up individual shaders (attached to program)
   gl.deleteShader(vert)
   gl.deleteShader(frag)
+  return program
+}
 
-  // Setup quad geometry
-  const buffer = gl.createBuffer()
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
-  gl.bufferData(gl.ARRAY_BUFFER, QUAD_VERTICES, gl.STATIC_DRAW)
-
-  const positionLoc = gl.getAttribLocation(program, 'position')
-  gl.enableVertexAttribArray(positionLoc)
-  gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0)
-
-  // Get uniform locations
-  const locations: UniformLocations = {
+/**
+ * Get all standard Shadertoy uniform locations from a program.
+ */
+export function getUniformLocations(gl: WebGLRenderingContext, program: WebGLProgram): UniformLocations {
+  return {
     iResolution: gl.getUniformLocation(program, 'iResolution'),
     iTime: gl.getUniformLocation(program, 'iTime'),
     iTimeDelta: gl.getUniformLocation(program, 'iTimeDelta'),
@@ -132,7 +118,40 @@ export function createRenderer(
     ],
     iChannelResolution: gl.getUniformLocation(program, 'iChannelResolution'),
   }
+}
 
+/**
+ * Setup the shared full-screen quad buffer.
+ */
+export function setupQuad(gl: WebGLRenderingContext, program: WebGLProgram): void {
+  const buffer = gl.createBuffer()
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer)
+  gl.bufferData(gl.ARRAY_BUFFER, QUAD_VERTICES, gl.STATIC_DRAW)
+  const positionLoc = gl.getAttribLocation(program, 'position')
+  gl.enableVertexAttribArray(positionLoc)
+  gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0)
+}
+
+/**
+ * Initialize WebGL: compile shaders, link program, setup quad.
+ * Returns RendererState on success or error string on failure.
+ */
+export function createRenderer(
+  canvas: HTMLCanvasElement,
+  fragmentShader: string,
+): RendererState | string {
+  const gl = canvas.getContext('webgl', {
+    antialias: false,
+    alpha: true,
+    premultipliedAlpha: false,
+  })
+  if (!gl) return 'WebGL not supported'
+
+  const program = createProgram(gl, fragmentShader)
+  if (typeof program === 'string') return program
+
+  setupQuad(gl, program)
+  const locations = getUniformLocations(gl, program)
   gl.useProgram(program)
 
   return {
