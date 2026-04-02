@@ -76,15 +76,13 @@ Maps all standard Shadertoy uniforms:
 />
 ```
 
-### API Integration (Pattern B: ID Lookup — Future)
+### API Integration (Pattern B: ID Lookup)
 
 ```tsx
-// Fetches GLSL from Shadertoy API at build time + caches locally
-<Shadertoy id="MdX3zr" />
+<Shadertoy id="MdX3zr" apiKey="your-key" />
 ```
 
-Note: Shadertoy API is limited to 1,500 requests/month. Build-time fetch + local cache mitigates this.
-License display is required (default: CC BY-NC-SA 3.0).
+Fetches from Shadertoy API, auto-converts to multipass config, shows author overlay.
 
 ### Hooks API
 
@@ -122,13 +120,17 @@ Lightness is a core value of this library.
 react-shadertoy/
 ├── src/
 │   ├── index.ts              # Barrel exports
-│   ├── Shadertoy.tsx          # Main component
-│   ├── useShadertoy.ts        # Hooks API
-│   ├── renderer.ts            # WebGL renderer (uniform mapping, render loop)
-│   ├── uniforms.ts            # Shadertoy uniform definitions + per-frame updates
+│   ├── Shadertoy.tsx          # Main component (+ license overlay)
+│   ├── useShadertoy.ts        # Hooks API (single-pass, multipass, API mode)
+│   ├── renderer.ts            # WebGL2 renderer (GLSL ES 3.0 preamble, quad)
+│   ├── uniforms.ts            # Shadertoy uniform per-frame updates
+│   ├── textures.ts            # Texture loading (URL, video, canvas, options)
+│   ├── multipass.ts           # FBO + ping-pong multipass pipeline
+│   ├── api.ts                 # Shadertoy API fetch + config conversion
 │   └── types.ts               # TypeScript type definitions
 ├── examples/
-│   └── basic/                 # Minimal example (Vite)
+│   └── basic/                 # Multi-shader example (Vite)
+├── test/                      # Real Shadertoy GLSL test shaders
 ├── package.json
 ├── tsconfig.json
 ├── README.md
@@ -173,15 +175,18 @@ react-shadertoy/
 - [x] iChannelResolution auto-detection
 - [x] `texture()` → `texture2D()` compatibility shim
 
-### Phase 3: Advanced (in progress)
+### Phase 3: Advanced ✅
 - [x] Multipass (Buffer A-D → Image) with FBO + ping-pong
-- [ ] Shadertoy API integration (ID lookup + build-time cache)
-- [ ] License info display
+- [x] WebGL2 migration (GLSL ES 3.0 — bitwise ops, int min/max, flexible loops)
+- [x] Alpha force 1.0 (Shadertoy opaque rendering compat)
+- [x] Shadertoy API integration (ID lookup + build-time cache)
+- [x] License info overlay
 
-### Phase 4: Ecosystem
-- [ ] Next.js / Vite / Remix templates
-- [ ] Storybook integration
-- [ ] Shadertoy import guide
+### Phase 4: Ecosystem ✅
+- [x] README full rewrite with all features documented
+- [x] Example app with 7+ shaders (texture, multipass, raymarching)
+- [ ] Next.js / Vite / Remix templates (future)
+- [ ] Storybook integration (future)
 
 ## Competitive Comparison
 
@@ -206,4 +211,4 @@ In the future, shabon-fx may use react-shadertoy internally.
 
 ---
 
-*Started 2026-04-02 — Phase 1 shipped*
+*Started 2026-04-02 — v0.5.0 shipped (Phase 1-3 complete)*

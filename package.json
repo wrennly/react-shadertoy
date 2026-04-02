@@ -1,6 +1,6 @@
 {
   "name": "react-shadertoy",
-  "version": "0.1.0",
+  "version": "0.6.0",
   "description": "Run Shadertoy GLSL shaders in React. Copy-paste and it works.",
   "author": "Wrennly (https://github.com/wrennly)",
   "license": "MIT",
