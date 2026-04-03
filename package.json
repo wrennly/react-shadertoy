@@ -1,6 +1,6 @@
 {
   "name": "react-shadertoy",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Run GLSL shaders in React — Shadertoy compatible, AI-friendly. Paste raw GLSL and it just works.",
   "author": "Wrennly (https://github.com/wrennly)",
   "license": "MIT",

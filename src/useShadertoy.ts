@@ -8,6 +8,11 @@ import { updateUniforms } from './uniforms'
 
 const CHANNEL_KEYS: (keyof TextureInputs)[] = ['iChannel0', 'iChannel1', 'iChannel2', 'iChannel3']
 
+function isGlslUrl(s?: string): boolean {
+  if (!s) return false
+  return /\.(glsl|frag|fs|vert|vs)(\?.*)?$/i.test(s) || (/^https?:\/\//.test(s) && !s.includes('mainImage'))
+}
+
 export function useShadertoy({
   fragmentShader,
   passes: passesProp,
@@ -32,12 +37,13 @@ export function useShadertoy({
   const [error, setError] = useState<string | null>(null)
   const [meta, setMeta] = useState<ShaderMeta | null>(null)
 
-  // Resolved config from API (or props)
+  // Resolved config from API / URL fetch (or props directly)
+  const needsFetch = !!id || isGlslUrl(fragmentShader)
   const [resolved, setResolved] = useState<{
     passes?: MultipassConfig
     textures?: TextureInputs
     fragmentShader?: string
-  } | null>(id ? null : { passes: passesProp, textures: texturesProp, fragmentShader })
+  } | null>(needsFetch ? null : { passes: passesProp, textures: texturesProp, fragmentShader })
 
   const mouseState = useRef<MouseState>({
     x: 0, y: 0,
@@ -86,6 +92,30 @@ export function useShadertoy({
 
     return () => { cancelled = true }
   }, [id, apiKey])
+
+  // Fetch GLSL from URL when fragmentShader looks like a file path
+  useEffect(() => {
+    if (id || !isGlslUrl(fragmentShader)) return
+
+    let cancelled = false
+    fetch(fragmentShader!)
+      .then(res => {
+        if (!res.ok) throw new Error(`Failed to fetch ${fragmentShader}: ${res.status}`)
+        return res.text()
+      })
+      .then(code => {
+        if (cancelled) return
+        setResolved({ fragmentShader: code, textures: texturesProp })
+      })
+      .catch(err => {
+        if (cancelled) return
+        const msg = err instanceof Error ? err.message : 'Failed to fetch shader'
+        setError(msg)
+        onError?.(msg)
+      })
+
+    return () => { cancelled = true }
+  }, [fragmentShader, id])
 
   const effectivePasses = resolved?.passes
   const effectiveTextures = resolved?.textures ?? texturesProp

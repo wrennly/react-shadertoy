@@ -39,6 +39,14 @@ function App() {
 
 Find a shader on [Shadertoy](https://www.shadertoy.com/), copy the GLSL code, paste it into `fragmentShader`. Done.
 
+### Load from File
+
+Pass a `.glsl` file path — it fetches automatically:
+
+```tsx
+<Shadertoy fragmentShader="/shaders/myeffect.glsl" />
+```
+
 ## Textures
 
 Pass image URLs, video elements, or canvas elements as textures:

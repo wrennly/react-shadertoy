@@ -15,8 +15,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 }
 `
 
-const CYBERSPACE = await fetch('/test/cyberspace.glsl').then(r => r.text()).catch(() => '')
-const LIVING_SHABON = await fetch('/test/living-shabon.glsl').then(r => r.text()).catch(() => '')
+// These two use the new GLSL URL feature — no manual fetch needed!
 const BUTTERFLY = await fetch('/test/butterfly.glsl').then(r => r.text()).catch(() => '')
 const SPACE_JOCKEY = await fetch('/test/space_jocky.glsl').then(r => r.text()).catch(() => '')
 const TUNNEL = await fetch('/test/tunnel.glsl').then(r => r.text()).catch(() => '')
@@ -45,8 +44,8 @@ const shaders: Record<string, ShaderEntry> = {
   ...(TUNNEL ? { 'Tunnel': { code: TUNNEL, textures: { iChannel0: '/gray-noise-256.png', iChannel1: '/gray-noise-256.png' } } } : {}),
   ...(BUTTERFLY ? { 'Butterfly': { code: BUTTERFLY, textures: { iChannel0: '/gray-noise-256.png', iChannel1: '/sky-256.png' } } } : {}),
   ...(SPACE_JOCKEY ? { 'Space Jockey': { code: SPACE_JOCKEY } } : {}),
-  ...(CYBERSPACE ? { 'Cyberspace': { code: CYBERSPACE } } : {}),
-  ...(LIVING_SHABON ? { 'Living Shabon': { code: LIVING_SHABON } } : {}),
+  'Cyberspace (URL)': { code: '/test/cyberspace.glsl' },
+  'Living Shabon (URL)': { code: '/test/living-shabon.glsl' },
   // API mode demos (need ?apiKey=xxx in URL)
   ...(API_KEY ? {
     'API: Seascape': { id: 'Ms2SD1', apiKey: API_KEY },
