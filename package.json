@@ -1,7 +1,7 @@
 {
   "name": "react-shadertoy",
-  "version": "0.6.0",
-  "description": "Run Shadertoy GLSL shaders in React. Copy-paste and it works.",
+  "version": "0.6.1",
+  "description": "Run GLSL shaders in React — Shadertoy compatible, AI-friendly. Paste raw GLSL and it just works.",
   "author": "Wrennly (https://github.com/wrennly)",
   "license": "MIT",
   "homepage": "https://github.com/wrennly/react-shadertoy",
@@ -14,12 +14,13 @@
     "shadertoy",
     "glsl",
     "webgl",
+    "webgl2",
     "shader",
     "fragment-shader",
     "creative-coding",
     "generative-art",
-    "webgpu",
-    "three.js"
+    "multipass",
+    "ai-friendly"
   ],
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

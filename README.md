@@ -176,6 +176,10 @@ function MyShader() {
 | `iChannel0-3` | `sampler2D` | Texture inputs |
 | `iChannelResolution` | `vec3[4]` | Texture dimensions |
 
+## Why Raw GLSL?
+
+AI coding assistants generate raw GLSL far more reliably than framework-specific shader APIs. GLSL is a standard with massive training data — no abstraction layers to get wrong. Ask any AI to "write a Shadertoy shader that does X" and paste the result directly into `fragmentShader`. It just works.
+
 ## License
 
 MIT
