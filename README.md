@@ -1,7 +1,8 @@
 # react-shadertoy
 
-Run [Shadertoy](https://www.shadertoy.com/) GLSL shaders in React. Copy-paste and it works.
+Run [Shadertoy](https://www.shadertoy.com/) GLSL shaders in React. Drop a `.glsl` file and it just works.
 
+- **File-based** — point to a `.glsl` file, swap shaders by swapping files
 - Zero dependencies (just React)
 - WebGL2 (GLSL ES 3.0) — full Shadertoy compatibility
 - All uniforms: `iTime`, `iResolution`, `iMouse`, `iDate`, `iFrame`, etc.
@@ -22,29 +23,28 @@ npm install react-shadertoy
 ```tsx
 import { Shadertoy } from 'react-shadertoy'
 
-function App() {
-  return (
-    <Shadertoy
-      style={{ width: '100%', height: '400px' }}
-      fragmentShader={`
-        void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-          vec2 uv = fragCoord / iResolution.xy;
-          fragColor = vec4(uv, 0.5 + 0.5 * sin(iTime), 1.0);
-        }
-      `}
-    />
-  )
-}
+// Point to a .glsl file — that's it
+<Shadertoy fragmentShader="/shaders/myeffect.glsl" style={{ width: '100%', height: '400px' }} />
 ```
 
-Find a shader on [Shadertoy](https://www.shadertoy.com/), copy the GLSL code, paste it into `fragmentShader`. Done.
+1. Save a shader from [Shadertoy](https://www.shadertoy.com/) as a `.glsl` file in your `public/` folder
+2. Point `fragmentShader` to the file path
+3. Done. Swap the file to swap the shader.
 
-### Load from File
+### Inline GLSL
 
-Pass a `.glsl` file path — it fetches automatically:
+You can also pass GLSL code directly as a string:
 
 ```tsx
-<Shadertoy fragmentShader="/shaders/myeffect.glsl" />
+<Shadertoy
+  style={{ width: '100%', height: '400px' }}
+  fragmentShader={`
+    void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+      vec2 uv = fragCoord / iResolution.xy;
+      fragColor = vec4(uv, 0.5 + 0.5 * sin(iTime), 1.0);
+    }
+  `}
+/>
 ```
 
 ## Textures
