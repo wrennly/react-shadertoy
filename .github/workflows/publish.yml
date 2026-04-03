@@ -20,7 +20,7 @@ jobs:
 
       - run: npm ci
 
-      - run: npx tsup src/index.ts --format esm,cjs --dts --external react --external react-dom --clean
+      - run: npm run build
 
       - run: npm publish --provenance --access public
         env:
