@@ -3,8 +3,8 @@ import { apiToConfig, fetchShader, isSinglePass } from './api'
 import { createMultipassRenderer, disposeMultipass, renderMultipass, resizeFBOs } from './multipass'
 import { createRenderer, dispose, render } from './renderer'
 import { bindTextures, createTexture, disposeTextures, updateDynamicTextures } from './textures'
-import type { MouseState, MultipassConfig, PassState, RendererState, ShaderMeta, TextureInputs, UseShadertoyOptions, UseShadertoyReturn } from './types'
-import { updateUniforms } from './uniforms'
+import type { CustomUniforms, FrameContext, MouseState, MultipassConfig, PassState, RendererState, ShaderMeta, TextureInputs, UseShadertoyOptions, UseShadertoyReturn } from './types'
+import { setCustomUniforms, updateUniforms } from './uniforms'
 
 const CHANNEL_KEYS: (keyof TextureInputs)[] = ['iChannel0', 'iChannel1', 'iChannel2', 'iChannel3']
 
@@ -25,6 +25,8 @@ export function useShadertoy({
   mouse: mouseEnabled = true,
   onError,
   onLoad,
+  uniforms: uniformsProp,
+  onFrame,
 }: UseShadertoyOptions): UseShadertoyReturn & { meta: ShaderMeta | null } {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const rendererRef = useRef<RendererState | null>(null)
@@ -32,6 +34,8 @@ export function useShadertoy({
   const rafRef = useRef<number>(0)
   const pausedRef = useRef(paused)
   const speedRef = useRef(speed)
+  const onFrameRef = useRef(onFrame)
+  const customUniformsRef = useRef<CustomUniforms>(uniformsProp ? { ...uniformsProp } : {})
 
   const [isReady, setIsReady] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -55,6 +59,13 @@ export function useShadertoy({
 
   pausedRef.current = paused
   speedRef.current = speed
+  onFrameRef.current = onFrame
+  // Merge prop changes into mutable ref (onFrame may have already mutated values)
+  if (uniformsProp) {
+    for (const [k, v] of Object.entries(uniformsProp)) {
+      customUniformsRef.current[k] = v
+    }
+  }
 
   // Fetch from Shadertoy API when id is provided
   useEffect(() => {
@@ -211,7 +222,7 @@ export function useShadertoy({
       }
     } else {
       const shaderCode = effectiveShader || 'void mainImage(out vec4 c, in vec2 f){ c = vec4(0); }'
-      const result = createRenderer(canvas, shaderCode)
+      const result = createRenderer(canvas, shaderCode, uniformsProp)
       if (typeof result === 'string') {
         handleError(result)
         return
@@ -239,6 +250,23 @@ export function useShadertoy({
           updateDynamicTextures(r.gl, r.textures)
           bindTextures(r.gl, r.locations.iChannel, r.textures)
           updateUniforms(r, delta, speedRef.current, mouseState.current)
+
+          // Custom uniforms + onFrame callback
+          if (onFrameRef.current) {
+            const ctx: FrameContext = {
+              time: r.time,
+              frame: r.frame,
+              delta,
+              uniforms: customUniformsRef.current,
+              resolution: [r.gl.drawingBufferWidth, r.gl.drawingBufferHeight],
+              mouse: mouseState.current,
+            }
+            onFrameRef.current(ctx)
+          }
+          if (Object.keys(customUniformsRef.current).length > 0) {
+            setCustomUniforms(r.gl, r.program, customUniformsRef.current)
+          }
+
           render(r)
         }
 

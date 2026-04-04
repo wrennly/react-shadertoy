@@ -16,6 +16,8 @@ export function Shadertoy({
   mouse,
   onError,
   onLoad,
+  uniforms,
+  onFrame,
 }: ShadertoyProps) {
   const { canvasRef, meta } = useShadertoy({
     fragmentShader,
@@ -29,6 +31,8 @@ export function Shadertoy({
     mouse,
     onError,
     onLoad,
+    uniforms,
+    onFrame,
   })
 
   const shouldShowLicense = showLicense ?? !!id

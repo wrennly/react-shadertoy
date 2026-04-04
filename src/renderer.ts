@@ -1,4 +1,4 @@
-import type { RendererState, UniformLocations } from './types'
+import type { CustomUniformValue, CustomUniforms, RendererState, UniformLocations } from './types'
 
 // Full-screen quad: two triangles covering clip space
 const QUAD_VERTICES = new Float32Array([
@@ -39,11 +39,28 @@ uniform vec3  iChannelResolution[4];
 
 `
 
+/** Build uniform declarations for custom uniforms */
+export function buildCustomDeclarations(uniforms?: CustomUniforms): string {
+  if (!uniforms) return ''
+  let decls = ''
+  for (const [name, value] of Object.entries(uniforms)) {
+    if (value instanceof Float32Array) {
+      decls += `uniform float ${name}[${value.length}];\n`
+    } else if (typeof value === 'number') {
+      decls += `uniform float ${name};\n`
+    } else if (Array.isArray(value)) {
+      const t = value.length === 2 ? 'vec2' : value.length === 3 ? 'vec3' : 'vec4'
+      decls += `uniform ${t} ${name};\n`
+    }
+  }
+  return decls
+}
+
 /**
  * Wrap Shadertoy GLSL: prepend uniform declarations + main() bridge.
  */
-export function wrapFragmentShader(shader: string): string {
-  return FRAGMENT_PREAMBLE + shader + `
+export function wrapFragmentShader(shader: string, customUniforms?: CustomUniforms): string {
+  return FRAGMENT_PREAMBLE + buildCustomDeclarations(customUniforms) + shader + `
 
 void main() {
   mainImage(_fragColor, gl_FragCoord.xy);
@@ -78,11 +95,12 @@ export function compileShader(
 export function createProgram(
   gl: WebGL2RenderingContext,
   fragmentShader: string,
+  customUniforms?: CustomUniforms,
 ): WebGLProgram | string {
   const vert = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER)
   if (typeof vert === 'string') return vert
 
-  const frag = compileShader(gl, gl.FRAGMENT_SHADER, wrapFragmentShader(fragmentShader))
+  const frag = compileShader(gl, gl.FRAGMENT_SHADER, wrapFragmentShader(fragmentShader, customUniforms))
   if (typeof frag === 'string') return frag
 
   const program = gl.createProgram()
@@ -143,6 +161,7 @@ export function setupQuad(gl: WebGL2RenderingContext, program: WebGLProgram): vo
 export function createRenderer(
   canvas: HTMLCanvasElement,
   fragmentShader: string,
+  customUniforms?: CustomUniforms,
 ): RendererState | string {
   const gl = canvas.getContext('webgl2', {
     antialias: false,
@@ -151,7 +170,7 @@ export function createRenderer(
   })
   if (!gl) return 'WebGL2 not supported'
 
-  const program = createProgram(gl, fragmentShader)
+  const program = createProgram(gl, fragmentShader, customUniforms)
   if (typeof program === 'string') return program
 
   setupQuad(gl, program)

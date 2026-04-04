@@ -142,6 +142,31 @@ export interface ShaderMeta {
   license?: string
 }
 
+// ── Custom uniforms ──
+
+/** Supported custom uniform value types */
+export type CustomUniformValue =
+  | number                                // → uniform float
+  | [number, number]                      // → uniform vec2
+  | [number, number, number]              // → uniform vec3
+  | [number, number, number, number]      // → uniform vec4
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  | Float32Array<any>                     // → uniform float[N]
+
+/** Map of custom uniform names to values */
+export type CustomUniforms = Record<string, CustomUniformValue>
+
+/** Context passed to onFrame callback */
+export interface FrameContext {
+  time: number
+  frame: number
+  delta: number
+  /** Mutable — modify values to update uniforms this frame */
+  uniforms: CustomUniforms
+  resolution: [number, number]
+  mouse: MouseState
+}
+
 export interface ShadertoyProps {
   /** Shadertoy-compatible GLSL fragment shader (must contain mainImage) */
   fragmentShader?: string
@@ -171,6 +196,10 @@ export interface ShadertoyProps {
   onError?: (error: string) => void
   /** Called when WebGL is ready */
   onLoad?: () => void
+  /** Custom uniforms (auto-declared in GLSL preamble) */
+  uniforms?: CustomUniforms
+  /** Per-frame callback — mutate ctx.uniforms to update values */
+  onFrame?: (ctx: FrameContext) => void
 }
 
 export interface UseShadertoyOptions {
@@ -185,6 +214,8 @@ export interface UseShadertoyOptions {
   mouse?: boolean
   onError?: (error: string) => void
   onLoad?: () => void
+  uniforms?: CustomUniforms
+  onFrame?: (ctx: FrameContext) => void
 }
 
 export interface UseShadertoyReturn {
