@@ -11,15 +11,27 @@ function isPassName(v: PassInput): v is PassName {
   return typeof v === 'string' && PASS_ORDER.includes(v as PassName)
 }
 
+/** Detect best float texture format: RGBA32F → RGBA16F → RGBA8 */
+function getBufferFormat(gl: WebGL2RenderingContext): { internalFormat: number; type: number } {
+  const cbf = gl.getExtension('EXT_color_buffer_float')
+  if (cbf) {
+    const ftl = gl.getExtension('OES_texture_float_linear')
+    if (ftl) return { internalFormat: gl.RGBA32F, type: gl.FLOAT }
+    return { internalFormat: gl.RGBA16F, type: gl.HALF_FLOAT }
+  }
+  return { internalFormat: gl.RGBA as number, type: gl.UNSIGNED_BYTE }
+}
+
 function createPingPongTextures(
   gl: WebGL2RenderingContext,
   w: number, h: number,
+  fmt: { internalFormat: number; type: number },
 ): [WebGLTexture, WebGLTexture] {
   const textures: WebGLTexture[] = []
   for (let i = 0; i < 2; i++) {
     const tex = gl.createTexture()!
     gl.bindTexture(gl.TEXTURE_2D, tex)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+    gl.texImage2D(gl.TEXTURE_2D, 0, fmt.internalFormat, w, h, 0, gl.RGBA, fmt.type, null)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
@@ -50,6 +62,7 @@ export function createMultipassRenderer(
 ): PassState[] | string {
   const w = gl.drawingBufferWidth || 1
   const h = gl.drawingBufferHeight || 1
+  const fmt = getBufferFormat(gl)
   const passes: PassState[] = []
 
   for (const name of PASS_ORDER) {
@@ -63,7 +76,7 @@ export function createMultipassRenderer(
     const locations = getUniformLocations(gl, program)
 
     const isImage = name === 'Image'
-    const pingPong = isImage ? null : createPingPongTextures(gl, w, h)
+    const pingPong = isImage ? null : createPingPongTextures(gl, w, h, fmt)
     const fbo = isImage ? null : createFBO(gl, pingPong![0])
 
     // Resolve channel bindings
@@ -80,11 +93,18 @@ export function createMultipassRenderer(
       }
     }
 
+    // Auto self-feedback: buffer passes read their own previous frame via iChannel0
+    if (!isImage && channelBindings[0] === null) {
+      channelBindings[0] = { passRef: name }
+    }
+
     passes.push({
       name, program, locations,
       fbo, pingPong, currentIdx: 0,
       width: w, height: h,
       channelBindings,
+      bufferFormat: isImage ? null : fmt,
+      channelResBuffer: new Float32Array(12),
     })
   }
 
@@ -157,8 +177,9 @@ export function renderMultipass(
     // Bind external textures
     bindTextures(gl, pass.locations.iChannel, tempTextures)
 
-    // Build iChannelResolution
-    const channelRes = new Float32Array(12)
+    // Build iChannelResolution (reuse buffer to avoid per-frame allocation)
+    const channelRes = pass.channelResBuffer
+    channelRes.fill(0)
     for (let i = 0; i < 4; i++) {
       const binding = pass.channelBindings[i]
       if (!binding) continue
@@ -196,13 +217,13 @@ export function resizeFBOs(
   w: number, h: number,
 ): void {
   for (const pass of passes) {
-    if (!pass.pingPong) continue
+    if (!pass.pingPong || !pass.bufferFormat) continue
     pass.width = w
     pass.height = h
 
     for (let i = 0; i < 2; i++) {
       gl.bindTexture(gl.TEXTURE_2D, pass.pingPong[i])
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null)
+      gl.texImage2D(gl.TEXTURE_2D, 0, pass.bufferFormat.internalFormat, w, h, 0, gl.RGBA, pass.bufferFormat.type, null)
     }
   }
 }

@@ -21,6 +21,8 @@ const SPACE_JOCKEY = await fetch('/test/space_jocky.glsl').then(r => r.text()).c
 const TUNNEL = await fetch('/test/tunnel.glsl').then(r => r.text()).catch(() => '')
 const RD_BUFFER_A = await fetch('/test/reaction-diffusion-bufferA.glsl').then(r => r.text()).catch(() => '')
 const RD_IMAGE = await fetch('/test/reaction-diffusion-image.glsl').then(r => r.text()).catch(() => '')
+const RAYMARCHING = await fetch('/test/raymarching-primitives.glsl').then(r => r.text()).catch(() => '')
+const SEASCAPE = await fetch('/test/seascape.glsl').then(r => r.text()).catch(() => '')
 
 type ShaderEntry = {
   code?: string
@@ -44,6 +46,8 @@ const shaders: Record<string, ShaderEntry> = {
   ...(TUNNEL ? { 'Tunnel': { code: TUNNEL, textures: { iChannel0: '/gray-noise-256.png', iChannel1: '/gray-noise-256.png' } } } : {}),
   ...(BUTTERFLY ? { 'Butterfly': { code: BUTTERFLY, textures: { iChannel0: '/gray-noise-256.png', iChannel1: '/sky-256.png' } } } : {}),
   ...(SPACE_JOCKEY ? { 'Space Jockey': { code: SPACE_JOCKEY } } : {}),
+  ...(RAYMARCHING ? { 'Raymarching': { code: RAYMARCHING } } : {}),
+  ...(SEASCAPE ? { 'Seascape': { code: SEASCAPE } } : {}),
   'Cyberspace (URL)': { code: '/test/cyberspace.glsl' },
   'Living Shabon (URL)': { code: '/test/living-shabon.glsl' },
   // API mode demos (need ?apiKey=xxx in URL)
@@ -56,6 +60,7 @@ const shaders: Record<string, ShaderEntry> = {
 function App() {
   const names = Object.keys(shaders)
   const [active, setActive] = useState(names[0])
+  const [glslError, setGlslError] = useState<string | null>(null)
   const shader = shaders[active]
 
   return (
@@ -67,7 +72,7 @@ function App() {
         {names.map(name => (
           <button
             key={name}
-            onClick={() => setActive(name)}
+            onClick={() => { setActive(name); setGlslError(null) }}
             style={{
               padding: '6px 14px',
               background: name === active ? '#fff' : 'rgba(255,255,255,0.15)',
@@ -80,6 +85,16 @@ function App() {
           </button>
         ))}
       </div>
+      {glslError && (
+        <pre style={{
+          position: 'fixed', bottom: 12, left: 12, right: 12, zIndex: 10,
+          background: 'rgba(200,0,0,0.9)', color: '#fff', padding: 12,
+          borderRadius: 6, fontSize: 12, maxHeight: '40vh', overflow: 'auto',
+          whiteSpace: 'pre-wrap',
+        }}>
+          {glslError}
+        </pre>
+      )}
       <Shadertoy
         key={active}
         fragmentShader={shader.code}
@@ -88,7 +103,7 @@ function App() {
         id={shader.id}
         apiKey={shader.apiKey}
         style={{ width: '100vw', height: '100vh' }}
-        onError={(err) => console.error('GLSL ERROR:', err)}
+        onError={(err) => { console.error('GLSL ERROR:', err); setGlslError(err) }}
       />
     </>
   )

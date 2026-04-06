@@ -37,6 +37,9 @@ uniform vec3  iChannelResolution[4];
 // Shadertoy compat: older shaders may use texture2D()
 #define texture2D texture
 
+// Shadertoy built-in defines
+#define HW_PERFORMANCE 1
+
 `
 
 /** Build uniform declarations for custom uniforms */
@@ -185,6 +188,8 @@ export function createRenderer(
     time: 0,
     frame: 0,
     lastTime: 0,
+    channelResBuffer: new Float32Array(12),
+    customUniformCache: new Map(),
   }
 }
 

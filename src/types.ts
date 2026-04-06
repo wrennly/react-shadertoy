@@ -74,6 +74,8 @@ export interface PassState {
   width: number
   height: number
   channelBindings: (TextureState | { passRef: PassName } | null)[]  // resolved per-channel
+  bufferFormat: { internalFormat: number; type: number } | null
+  channelResBuffer: Float32Array
 }
 
 // ── Shadertoy API response types ──
@@ -254,4 +256,6 @@ export interface RendererState {
   time: number
   frame: number
   lastTime: number
+  channelResBuffer: Float32Array
+  customUniformCache: Map<string, WebGLUniformLocation | null>
 }

@@ -7,7 +7,8 @@ Run [Shadertoy](https://www.shadertoy.com/) GLSL shaders in React. Drop a `.glsl
 - WebGL2 (GLSL ES 3.0) — full Shadertoy compatibility
 - All uniforms: `iTime`, `iResolution`, `iMouse`, `iDate`, `iFrame`, etc.
 - iChannel0-3 textures (image URL, video, canvas, with wrap/filter/vflip)
-- Multipass rendering (Buffer A-D with ping-pong FBO)
+- **RGBA32F** multipass rendering (Buffer A-D with ping-pong FBO, float precision matching Shadertoy)
+- Auto self-feedback — buffer passes read their own previous frame by default
 - Shadertoy API integration (`<Shadertoy id="MdX3zr" />`)
 - Mouse & touch interaction built-in
 - TypeScript-first
@@ -83,14 +84,14 @@ Control wrap mode, filtering, and vertical flip:
 
 ## Multipass
 
-Buffer A-D with self-referencing feedback loops:
+Buffer A-D with RGBA32F precision and automatic self-feedback:
 
 ```tsx
 <Shadertoy
   passes={{
     BufferA: {
       code: bufferACode,
-      iChannel0: 'BufferA',    // self-reference (previous frame)
+      // iChannel0 auto-binds to own previous frame (self-feedback)
       iChannel1: '/noise.png', // external texture
     },
     BufferB: {
@@ -104,6 +105,11 @@ Buffer A-D with self-referencing feedback loops:
     },
   }}
 />
+```
+
+Buffer passes automatically read their own previous frame via `iChannel0` (Shadertoy default behavior). Override by explicitly setting `iChannel0` to something else.
+
+Multipass uses **RGBA32F** textures (with RGBA16F/RGBA8 fallback), matching Shadertoy's float precision for fluid simulations, reaction-diffusion, and physics shaders.
 ```
 
 ## Shadertoy API
@@ -168,6 +174,8 @@ function MyShader() {
 | `speed` | `number` | `1.0` | `iTime` speed multiplier |
 | `pixelRatio` | `number` | `devicePixelRatio` | Canvas pixel ratio |
 | `mouse` | `boolean` | `true` | Enable mouse/touch tracking |
+| `uniforms` | `CustomUniforms` | — | Custom uniform values |
+| `onFrame` | `(ctx: FrameContext) => void` | — | Per-frame callback |
 | `onError` | `(error: string) => void` | — | GLSL compile error callback |
 | `onLoad` | `() => void` | — | WebGL ready callback |
 

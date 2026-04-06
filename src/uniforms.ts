@@ -36,15 +36,26 @@ export function setUniforms(
 }
 
 /**
- * Set custom uniforms on a program. Looks up locations each call (WebGL caches internally).
+ * Set custom uniforms on a program. Caches uniform locations to avoid per-frame lookups.
  */
 export function setCustomUniforms(
   gl: WebGL2RenderingContext,
   program: WebGLProgram,
   uniforms: CustomUniforms,
+  locationCache?: Map<string, WebGLUniformLocation | null>,
 ): void {
   for (const [name, value] of Object.entries(uniforms)) {
-    const loc = gl.getUniformLocation(program, name)
+    let loc: WebGLUniformLocation | null
+    if (locationCache) {
+      if (locationCache.has(name)) {
+        loc = locationCache.get(name)!
+      } else {
+        loc = gl.getUniformLocation(program, name)
+        locationCache.set(name, loc)
+      }
+    } else {
+      loc = gl.getUniformLocation(program, name)
+    }
     if (!loc) continue
     if (value instanceof Float32Array) {
       gl.uniform1fv(loc, value)
@@ -73,8 +84,9 @@ export function updateUniforms(
   state.time += delta * speed
   state.frame++
 
-  // Build channel resolution array
-  const res = new Float32Array(12)
+  // Build channel resolution array (reuse buffer)
+  const res = state.channelResBuffer
+  res.fill(0)
   for (let i = 0; i < 4; i++) {
     const tex = state.textures[i]
     if (tex) {

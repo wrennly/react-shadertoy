@@ -135,7 +135,7 @@ export function useShadertoy({
 
   // Initialize WebGL
   useEffect(() => {
-    if (id && !resolved) return // Still fetching from API
+    if (needsFetch && !resolved) return // Still fetching from API or URL
 
     const canvas = canvasRef.current
     if (!canvas) return
@@ -264,7 +264,7 @@ export function useShadertoy({
             onFrameRef.current(ctx)
           }
           if (Object.keys(customUniformsRef.current).length > 0) {
-            setCustomUniforms(r.gl, r.program, customUniformsRef.current)
+            setCustomUniforms(r.gl, r.program, customUniformsRef.current, r.customUniformCache)
           }
 
           render(r)
