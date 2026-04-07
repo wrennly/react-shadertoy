@@ -201,6 +201,8 @@ export interface ShadertoyProps {
   mouse?: boolean
   /** Enable keyboard input texture (default: false) */
   keyboard?: boolean
+  /** Enable audio input texture — true for mic, or pass a MediaStream (default: false) */
+  audio?: boolean | MediaStream
   /** Called when GLSL compilation fails */
   onError?: (error: string) => void
   /** Called when WebGL is ready */
@@ -222,6 +224,7 @@ export interface UseShadertoyOptions {
   pixelRatio?: number
   mouse?: boolean
   keyboard?: boolean
+  audio?: boolean | MediaStream
   onError?: (error: string) => void
   onLoad?: () => void
   uniforms?: CustomUniforms
@@ -252,6 +255,19 @@ export interface KeyboardState {
   toggles: Uint8Array
   /** Whether any key changed this frame */
   dirty: boolean
+}
+
+export interface AudioState {
+  /** 512×2 texture data (row0=FFT, row1=waveform) */
+  data: Uint8Array
+  /** AnalyserNode frequency data buffer */
+  frequencyData: Uint8Array
+  /** AnalyserNode time-domain data buffer */
+  waveformData: Uint8Array
+  /** WebAudio resources */
+  context: AudioContext | null
+  analyser: AnalyserNode | null
+  sourceNode: MediaStreamAudioSourceNode | null
 }
 
 export interface UniformLocations {

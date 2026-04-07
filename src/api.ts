@@ -123,8 +123,10 @@ export function apiToConfig(shader: ShadertoyApiShader): {
         textures[texKey] = texOpts
       } else if (input.ctype === 'keyboard') {
         ;(passConfig as any)[channelKey] = { keyboard: true }
+      } else if (input.ctype === 'microphone' || input.ctype === 'music') {
+        ;(passConfig as any)[channelKey] = { audio: true }
       }
-      // video, music etc. — skip for now
+      // video etc. — skip for now
     }
 
     passes[passName] = passConfig

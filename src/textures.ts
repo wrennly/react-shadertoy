@@ -1,4 +1,4 @@
-import type { KeyboardState, TextureFilter, TextureInput, TextureOptions, TextureSource, TextureState, TextureWrap } from './types'
+import type { AudioState, KeyboardState, TextureFilter, TextureInput, TextureOptions, TextureSource, TextureState, TextureWrap } from './types'
 
 /** Normalize shorthand TextureInput → { src, wrap, filter, vflip } */
 export function normalizeTextureInput(input: TextureInput): TextureOptions {
@@ -271,6 +271,45 @@ export function updateKeyboardTexture(
   gl.bindTexture(gl.TEXTURE_2D, tex.texture)
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 256, 3, gl.RED, gl.UNSIGNED_BYTE, keyboard.data)
   keyboard.dirty = false
+}
+
+// ── Audio texture ──
+
+/**
+ * Create a 512×2 R8 texture for Shadertoy audio input.
+ * Row 0: FFT frequency spectrum, Row 1: audio waveform.
+ */
+export function createAudioTexture(
+  gl: WebGL2RenderingContext,
+  unit: number,
+): TextureState {
+  const texture = gl.createTexture()!
+  gl.activeTexture(gl.TEXTURE0 + unit)
+  gl.bindTexture(gl.TEXTURE_2D, texture)
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 512, 2, 0, gl.RED, gl.UNSIGNED_BYTE, null)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+  return { texture, width: 512, height: 2, unit, loaded: true, needsUpdate: true, source: null }
+}
+
+/**
+ * Read FFT + waveform from AnalyserNode and upload to texture.
+ */
+export function updateAudioTexture(
+  gl: WebGL2RenderingContext,
+  tex: TextureState,
+  audio: AudioState,
+): void {
+  if (!audio.analyser) return
+  audio.analyser.getByteFrequencyData(audio.frequencyData)
+  audio.analyser.getByteTimeDomainData(audio.waveformData)
+  audio.data.set(audio.frequencyData, 0)
+  audio.data.set(audio.waveformData, 512)
+  gl.activeTexture(gl.TEXTURE0 + tex.unit)
+  gl.bindTexture(gl.TEXTURE_2D, tex.texture)
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 512, 2, gl.RED, gl.UNSIGNED_BYTE, audio.data)
 }
 
 // ── Cubemap texture ──

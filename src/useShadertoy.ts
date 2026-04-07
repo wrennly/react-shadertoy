@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiToConfig, fetchShader, isSinglePass } from './api'
 import { createMultipassRenderer, disposeMultipass, renderMultipass, resizeFBOs } from './multipass'
 import { createRenderer, dispose, render } from './renderer'
-import { bindTextures, createKeyboardTexture, createTexture, disposeTextures, updateDynamicTextures, updateKeyboardTexture } from './textures'
-import type { CustomUniforms, FrameContext, KeyboardState, MouseState, MultipassConfig, PassState, RendererState, ShaderMeta, TextureInputs, TextureState, UseShadertoyOptions, UseShadertoyReturn } from './types'
+import { bindTextures, createAudioTexture, createKeyboardTexture, createTexture, disposeTextures, updateAudioTexture, updateDynamicTextures, updateKeyboardTexture } from './textures'
+import type { AudioState, CustomUniforms, FrameContext, KeyboardState, MouseState, MultipassConfig, PassState, RendererState, ShaderMeta, TextureInputs, TextureState, UseShadertoyOptions, UseShadertoyReturn } from './types'
 import { setCustomUniforms, updateUniforms } from './uniforms'
 
 const CHANNEL_KEYS: (keyof TextureInputs)[] = ['iChannel0', 'iChannel1', 'iChannel2', 'iChannel3']
@@ -24,6 +24,7 @@ export function useShadertoy({
   pixelRatio,
   mouse: mouseEnabled = true,
   keyboard: keyboardEnabled = false,
+  audio: audioEnabled = false,
   onError,
   onLoad,
   uniforms: uniformsProp,
@@ -62,6 +63,16 @@ export function useShadertoy({
     dirty: false,
   })
   const keyboardTexRef = useRef<TextureState | null>(null)
+
+  const audioState = useRef<AudioState>({
+    data: new Uint8Array(512 * 2),
+    frequencyData: new Uint8Array(512),
+    waveformData: new Uint8Array(512),
+    context: null,
+    analyser: null,
+    sourceNode: null,
+  })
+  const audioTexRef = useRef<TextureState | null>(null)
 
   const sharedState = useRef({ time: 0, frame: 0 })
 
@@ -177,12 +188,23 @@ export function useShadertoy({
 
     // Create keyboard texture if enabled and a channel is available
     if (keyboardEnabled) {
-      // Use first empty channel for keyboard
       for (let i = 0; i < 4; i++) {
         if (!externalTextures[i]) {
           const kbTex = createKeyboardTexture(gl, i)
           externalTextures[i] = kbTex
           keyboardTexRef.current = kbTex
+          break
+        }
+      }
+    }
+
+    // Create audio texture if enabled
+    if (audioEnabled) {
+      for (let i = 0; i < 4; i++) {
+        if (!externalTextures[i]) {
+          const audioTex = createAudioTexture(gl, i)
+          externalTextures[i] = audioTex
+          audioTexRef.current = audioTex
           break
         }
       }
@@ -229,6 +251,9 @@ export function useShadertoy({
             kb.data.fill(0, 256, 512)
             kb.dirty = true
             updateKeyboardTexture(gl, keyboardTexRef.current, kb)
+          }
+          if (audioTexRef.current) {
+            updateAudioTexture(gl, audioTexRef.current, audioState.current)
           }
           updateDynamicTextures(gl, externalTextures)
           renderMultipass(gl, multipassRef.current, delta, speedRef.current, mouseState.current, sharedState.current)
@@ -281,6 +306,9 @@ export function useShadertoy({
             kb.data.fill(0, 256, 512)
             kb.dirty = true
             updateKeyboardTexture(r.gl, keyboardTexRef.current, kb)
+          }
+          if (audioTexRef.current) {
+            updateAudioTexture(r.gl, audioTexRef.current, audioState.current)
           }
           updateDynamicTextures(r.gl, r.textures)
           bindTextures(r.gl, r.locations.iChannel, r.textures)
@@ -442,6 +470,49 @@ export function useShadertoy({
       window.removeEventListener('keyup', onKeyUp)
     }
   }, [keyboardEnabled])
+
+  // Audio input (microphone or external MediaStream)
+  useEffect(() => {
+    if (!audioEnabled) return
+
+    let cancelled = false
+    const setup = async () => {
+      try {
+        const stream = audioEnabled instanceof MediaStream
+          ? audioEnabled
+          : await navigator.mediaDevices.getUserMedia({ audio: true })
+
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return }
+
+        const ctx = new AudioContext()
+        const analyser = ctx.createAnalyser()
+        analyser.fftSize = 1024
+        analyser.smoothingTimeConstant = 0.8
+
+        const source = ctx.createMediaStreamSource(stream)
+        source.connect(analyser)
+
+        const as = audioState.current
+        as.context = ctx
+        as.analyser = analyser
+        as.sourceNode = source
+      } catch (err) {
+        onError?.(err instanceof Error ? err.message : 'Microphone access denied')
+      }
+    }
+
+    setup()
+
+    return () => {
+      cancelled = true
+      const as = audioState.current
+      as.sourceNode?.disconnect()
+      as.context?.close()
+      as.context = null
+      as.analyser = null
+      as.sourceNode = null
+    }
+  }, [audioEnabled])
 
   const pause = useCallback(() => { pausedRef.current = true }, [])
   const resume = useCallback(() => { pausedRef.current = false }, [])
