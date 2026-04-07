@@ -1,4 +1,4 @@
-import type { CustomUniformValue, CustomUniforms, RendererState, UniformLocations } from './types'
+import type { ChannelType, CustomUniformValue, CustomUniforms, RendererState, UniformLocations } from './types'
 
 // Full-screen quad: two triangles covering clip space
 const QUAD_VERTICES = new Float32Array([
@@ -17,7 +17,14 @@ void main() {
 }
 `
 
-export const FRAGMENT_PREAMBLE = `#version 300 es
+/** Build GLSL preamble with per-channel sampler type (sampler2D or samplerCube) */
+export function buildPreamble(channelTypes?: ChannelType[]): string {
+  const types = channelTypes ?? ['2d', '2d', '2d', '2d']
+  const samplerDecls = types.map((t, i) =>
+    `uniform ${t === 'cube' ? 'samplerCube' : 'sampler2D'} iChannel${i};`
+  ).join('\n')
+
+  return `#version 300 es
 precision highp float;
 
 out vec4 _fragColor;
@@ -28,10 +35,7 @@ uniform float iTimeDelta;
 uniform int   iFrame;
 uniform vec4  iMouse;
 uniform vec4  iDate;
-uniform sampler2D iChannel0;
-uniform sampler2D iChannel1;
-uniform sampler2D iChannel2;
-uniform sampler2D iChannel3;
+${samplerDecls}
 uniform vec3  iChannelResolution[4];
 uniform float iChannelTime[4];
 uniform float iSampleRate;
@@ -48,6 +52,10 @@ uniform float iSampleRate;
 #define HW_PERFORMANCE 1
 
 `
+}
+
+/** Default preamble with all sampler2D channels */
+export const FRAGMENT_PREAMBLE = buildPreamble()
 
 /** Build uniform declarations for custom uniforms */
 export function buildCustomDeclarations(uniforms?: CustomUniforms): string {
@@ -69,8 +77,9 @@ export function buildCustomDeclarations(uniforms?: CustomUniforms): string {
 /**
  * Wrap Shadertoy GLSL: prepend uniform declarations + main() bridge.
  */
-export function wrapFragmentShader(shader: string, customUniforms?: CustomUniforms): string {
-  return FRAGMENT_PREAMBLE + buildCustomDeclarations(customUniforms) + shader + `
+export function wrapFragmentShader(shader: string, customUniforms?: CustomUniforms, channelTypes?: ChannelType[]): string {
+  const preamble = channelTypes ? buildPreamble(channelTypes) : FRAGMENT_PREAMBLE
+  return preamble + buildCustomDeclarations(customUniforms) + shader + `
 
 void main() {
   mainImage(_fragColor, gl_FragCoord.xy);
@@ -106,11 +115,12 @@ export function createProgram(
   gl: WebGL2RenderingContext,
   fragmentShader: string,
   customUniforms?: CustomUniforms,
+  channelTypes?: ChannelType[],
 ): WebGLProgram | string {
   const vert = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER)
   if (typeof vert === 'string') return vert
 
-  const frag = compileShader(gl, gl.FRAGMENT_SHADER, wrapFragmentShader(fragmentShader, customUniforms))
+  const frag = compileShader(gl, gl.FRAGMENT_SHADER, wrapFragmentShader(fragmentShader, customUniforms, channelTypes))
   if (typeof frag === 'string') return frag
 
   const program = gl.createProgram()

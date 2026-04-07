@@ -1,4 +1,4 @@
-import type { TextureFilter, TextureInput, TextureOptions, TextureSource, TextureState, TextureWrap } from './types'
+import type { KeyboardState, TextureFilter, TextureInput, TextureOptions, TextureSource, TextureState, TextureWrap } from './types'
 
 /** Normalize shorthand TextureInput → { src, wrap, filter, vflip } */
 export function normalizeTextureInput(input: TextureInput): TextureOptions {
@@ -217,7 +217,8 @@ export function bindTextures(
     const tex = textures[i]
     if (!tex) continue
     gl.activeTexture(gl.TEXTURE0 + tex.unit)
-    gl.bindTexture(gl.TEXTURE_2D, tex.texture)
+    const target = tex.isCube ? gl.TEXTURE_CUBE_MAP : gl.TEXTURE_2D
+    gl.bindTexture(target, tex.texture)
     if (locations[i]) {
       gl.uniform1i(locations[i], tex.unit)
     }
@@ -234,4 +235,107 @@ export function disposeTextures(
   for (const tex of textures) {
     if (tex) gl.deleteTexture(tex.texture)
   }
+}
+
+// ── Keyboard texture ──
+
+/**
+ * Create a 256×3 R8 texture for Shadertoy keyboard input.
+ * Row 0: keyDown, Row 1: keyPressed (single frame), Row 2: toggle.
+ */
+export function createKeyboardTexture(
+  gl: WebGL2RenderingContext,
+  unit: number,
+): TextureState {
+  const texture = gl.createTexture()!
+  gl.activeTexture(gl.TEXTURE0 + unit)
+  gl.bindTexture(gl.TEXTURE_2D, texture)
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 3, 0, gl.RED, gl.UNSIGNED_BYTE, null)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+  return { texture, width: 256, height: 3, unit, loaded: true, needsUpdate: true, source: null }
+}
+
+/**
+ * Upload keyboard state to texture. Skips upload if no keys changed.
+ */
+export function updateKeyboardTexture(
+  gl: WebGL2RenderingContext,
+  tex: TextureState,
+  keyboard: KeyboardState,
+): void {
+  if (!keyboard.dirty) return
+  gl.activeTexture(gl.TEXTURE0 + tex.unit)
+  gl.bindTexture(gl.TEXTURE_2D, tex.texture)
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 256, 3, gl.RED, gl.UNSIGNED_BYTE, keyboard.data)
+  keyboard.dirty = false
+}
+
+// ── Cubemap texture ──
+
+const CUBE_FACES = [
+  0x8515, // TEXTURE_CUBE_MAP_POSITIVE_X
+  0x8516, // TEXTURE_CUBE_MAP_NEGATIVE_X
+  0x8517, // TEXTURE_CUBE_MAP_POSITIVE_Y
+  0x8518, // TEXTURE_CUBE_MAP_NEGATIVE_Y
+  0x8519, // TEXTURE_CUBE_MAP_POSITIVE_Z
+  0x851A, // TEXTURE_CUBE_MAP_NEGATIVE_Z
+]
+
+/**
+ * Create a cubemap texture from 6 face URLs.
+ */
+export function createCubemapTexture(
+  gl: WebGL2RenderingContext,
+  faces: string[],
+  unit: number,
+): { state: TextureState; promise: Promise<void> } {
+  const texture = gl.createTexture()!
+  gl.activeTexture(gl.TEXTURE0 + unit)
+  gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture)
+
+  // Magenta placeholder for all 6 faces
+  for (const target of CUBE_FACES) {
+    gl.texImage2D(target, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+      new Uint8Array([255, 0, 255, 255]))
+  }
+
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+
+  const state: TextureState = {
+    texture, width: 1, height: 1, unit,
+    loaded: false, needsUpdate: false, source: null,
+    isCube: true,
+  }
+
+  const promise = Promise.all(
+    faces.map((url, i) => new Promise<void>((resolve, reject) => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        if (gl.isContextLost()) { resolve(); return }
+        gl.activeTexture(gl.TEXTURE0 + unit)
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture)
+        gl.texImage2D(CUBE_FACES[i], 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img)
+        if (i === 0) { state.width = img.width; state.height = img.height }
+        resolve()
+      }
+      img.onerror = () => reject(new Error(`Failed to load cubemap face: ${url}`))
+      img.src = url
+    }))
+  ).then(() => {
+    if (gl.isContextLost()) return
+    state.loaded = true
+    gl.activeTexture(gl.TEXTURE0 + unit)
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture)
+    gl.generateMipmap(gl.TEXTURE_CUBE_MAP)
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+  })
+
+  return { state, promise }
 }

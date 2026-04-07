@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiToConfig, fetchShader, isSinglePass } from './api'
 import { createMultipassRenderer, disposeMultipass, renderMultipass, resizeFBOs } from './multipass'
 import { createRenderer, dispose, render } from './renderer'
-import { bindTextures, createTexture, disposeTextures, updateDynamicTextures } from './textures'
-import type { CustomUniforms, FrameContext, MouseState, MultipassConfig, PassState, RendererState, ShaderMeta, TextureInputs, UseShadertoyOptions, UseShadertoyReturn } from './types'
+import { bindTextures, createKeyboardTexture, createTexture, disposeTextures, updateDynamicTextures, updateKeyboardTexture } from './textures'
+import type { CustomUniforms, FrameContext, KeyboardState, MouseState, MultipassConfig, PassState, RendererState, ShaderMeta, TextureInputs, TextureState, UseShadertoyOptions, UseShadertoyReturn } from './types'
 import { setCustomUniforms, updateUniforms } from './uniforms'
 
 const CHANNEL_KEYS: (keyof TextureInputs)[] = ['iChannel0', 'iChannel1', 'iChannel2', 'iChannel3']
@@ -23,6 +23,7 @@ export function useShadertoy({
   speed = 1.0,
   pixelRatio,
   mouse: mouseEnabled = true,
+  keyboard: keyboardEnabled = false,
   onError,
   onLoad,
   uniforms: uniformsProp,
@@ -54,6 +55,13 @@ export function useShadertoy({
     clickX: 0, clickY: 0,
     pressed: false,
   })
+
+  const keyboardState = useRef<KeyboardState>({
+    data: new Uint8Array(256 * 3),
+    toggles: new Uint8Array(256),
+    dirty: false,
+  })
+  const keyboardTexRef = useRef<TextureState | null>(null)
 
   const sharedState = useRef({ time: 0, frame: 0 })
 
@@ -154,7 +162,7 @@ export function useShadertoy({
       return
     }
 
-    const externalTextures: (import('./types').TextureState | null)[] = [null, null, null, null]
+    const externalTextures: (TextureState | null)[] = [null, null, null, null]
     const texturePromises: Promise<void>[] = []
     if (effectiveTextures) {
       for (let i = 0; i < 4; i++) {
@@ -163,6 +171,19 @@ export function useShadertoy({
           const { state, promise } = createTexture(gl, src, i)
           externalTextures[i] = state
           if (promise) texturePromises.push(promise)
+        }
+      }
+    }
+
+    // Create keyboard texture if enabled and a channel is available
+    if (keyboardEnabled) {
+      // Use first empty channel for keyboard
+      for (let i = 0; i < 4; i++) {
+        if (!externalTextures[i]) {
+          const kbTex = createKeyboardTexture(gl, i)
+          externalTextures[i] = kbTex
+          keyboardTexRef.current = kbTex
+          break
         }
       }
     }
@@ -202,6 +223,13 @@ export function useShadertoy({
         lastTimestamp = timestamp
 
         if (!pausedRef.current && multipassRef.current) {
+          // Clear keyPressed row (row 1) each frame
+          if (keyboardTexRef.current) {
+            const kb = keyboardState.current
+            kb.data.fill(0, 256, 512)
+            kb.dirty = true
+            updateKeyboardTexture(gl, keyboardTexRef.current, kb)
+          }
           updateDynamicTextures(gl, externalTextures)
           renderMultipass(gl, multipassRef.current, delta, speedRef.current, mouseState.current, sharedState.current)
         }
@@ -247,6 +275,13 @@ export function useShadertoy({
 
         if (!pausedRef.current && rendererRef.current) {
           const r = rendererRef.current
+          // Clear keyPressed row (row 1) each frame
+          if (keyboardTexRef.current) {
+            const kb = keyboardState.current
+            kb.data.fill(0, 256, 512)
+            kb.dirty = true
+            updateKeyboardTexture(r.gl, keyboardTexRef.current, kb)
+          }
           updateDynamicTextures(r.gl, r.textures)
           bindTextures(r.gl, r.locations.iChannel, r.textures)
           updateUniforms(r, delta, speedRef.current, mouseState.current)
@@ -375,6 +410,38 @@ export function useShadertoy({
       window.removeEventListener('touchend', te)
     }
   }, [mouseEnabled, pixelRatio])
+
+  // Keyboard events (Shadertoy keyboard texture)
+  useEffect(() => {
+    if (!keyboardEnabled) return
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const code = e.keyCode & 0xFF
+      const kb = keyboardState.current
+      if (!kb.data[code]) {
+        kb.data[code] = 255                    // Row 0: keyDown
+        kb.data[256 + code] = 255              // Row 1: keyPressed (1 frame)
+        kb.toggles[code] ^= 255               // Toggle
+        kb.data[512 + code] = kb.toggles[code] // Row 2: toggle
+        kb.dirty = true
+      }
+    }
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      const code = e.keyCode & 0xFF
+      const kb = keyboardState.current
+      kb.data[code] = 0  // Row 0: keyDown off
+      kb.dirty = true
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    }
+  }, [keyboardEnabled])
 
   const pause = useCallback(() => { pausedRef.current = true }, [])
   const resume = useCallback(() => { pausedRef.current = false }, [])

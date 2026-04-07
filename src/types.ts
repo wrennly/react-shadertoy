@@ -9,6 +9,7 @@ export type TextureSource =
 
 export type TextureWrap = 'clamp' | 'repeat' | 'mirror'
 export type TextureFilter = 'nearest' | 'linear' | 'mipmap'
+export type ChannelType = '2d' | 'cube'
 
 /** Advanced texture options with wrap/filter/vflip control */
 export interface TextureOptions {
@@ -16,6 +17,8 @@ export interface TextureOptions {
   wrap?: TextureWrap
   filter?: TextureFilter
   vflip?: boolean
+  /** Cubemap texture (6-face) */
+  cube?: boolean
 }
 
 /** A texture input: shorthand source or full options object */
@@ -40,6 +43,8 @@ export interface TextureState {
   needsUpdate: boolean
   /** Original source reference (for dynamic re-upload) */
   source: TextureSource | null
+  /** True for cubemap textures (TEXTURE_CUBE_MAP) */
+  isCube?: boolean
 }
 
 // ── Multipass types ──
@@ -194,6 +199,8 @@ export interface ShadertoyProps {
   pixelRatio?: number
   /** Enable mouse/touch tracking (default: true) */
   mouse?: boolean
+  /** Enable keyboard input texture (default: false) */
+  keyboard?: boolean
   /** Called when GLSL compilation fails */
   onError?: (error: string) => void
   /** Called when WebGL is ready */
@@ -214,6 +221,7 @@ export interface UseShadertoyOptions {
   speed?: number
   pixelRatio?: number
   mouse?: boolean
+  keyboard?: boolean
   onError?: (error: string) => void
   onLoad?: () => void
   uniforms?: CustomUniforms
@@ -235,6 +243,15 @@ export interface MouseState {
   clickX: number
   clickY: number
   pressed: boolean
+}
+
+export interface KeyboardState {
+  /** 256×3 texture data buffer (row0=keyDown, row1=keyPressed, row2=toggle) */
+  data: Uint8Array
+  /** Per-key toggle state */
+  toggles: Uint8Array
+  /** Whether any key changed this frame */
+  dirty: boolean
 }
 
 export interface UniformLocations {

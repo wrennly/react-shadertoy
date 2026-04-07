@@ -97,7 +97,7 @@ export function apiToConfig(shader: ShadertoyApiShader): {
         if (refPass) {
           ;(passConfig as any)[channelKey] = refPass
         }
-      } else if (input.ctype === 'texture' || input.ctype === 'cubemap') {
+      } else if (input.ctype === 'texture') {
         const texOpts: TextureOptions = {
           src: resolveTextureSrc(input.src),
           wrap: mapWrap(input.sampler.wrap),
@@ -109,8 +109,22 @@ export function apiToConfig(shader: ShadertoyApiShader): {
         // Also store in flat textures for single-pass fallback
         const texKey = `iChannel${input.channel}` as keyof TextureInputs
         textures[texKey] = texOpts
+      } else if (input.ctype === 'cubemap') {
+        const texOpts: TextureOptions = {
+          src: resolveTextureSrc(input.src),
+          wrap: mapWrap(input.sampler.wrap),
+          filter: mapFilter(input.sampler.filter),
+          vflip: input.sampler.vflip === 'true',
+          cube: true,
+        }
+        ;(passConfig as any)[channelKey] = texOpts
+
+        const texKey = `iChannel${input.channel}` as keyof TextureInputs
+        textures[texKey] = texOpts
+      } else if (input.ctype === 'keyboard') {
+        ;(passConfig as any)[channelKey] = { keyboard: true }
       }
-      // keyboard, video, music etc. — skip for now
+      // video, music etc. — skip for now
     }
 
     passes[passName] = passConfig

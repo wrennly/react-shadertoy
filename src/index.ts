@@ -1,5 +1,5 @@
 export { Shadertoy } from './Shadertoy'
-export type { ShadertoyProps, TextureInputs, TextureInput, TextureOptions, TextureWrap, TextureFilter, MultipassConfig, PassConfig, PassName, ShaderMeta, ShadertoyApiShader, CustomUniformValue, CustomUniforms, FrameContext } from './types'
+export type { ShadertoyProps, TextureInputs, TextureInput, TextureOptions, TextureWrap, TextureFilter, ChannelType, MultipassConfig, PassConfig, PassName, ShaderMeta, ShadertoyApiShader, CustomUniformValue, CustomUniforms, FrameContext, KeyboardState } from './types'
 export { useShadertoy } from './useShadertoy'
 export type { UseShadertoyOptions, UseShadertoyReturn } from './types'
 export { fetchShader, apiToConfig } from './api'
