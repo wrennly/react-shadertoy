@@ -31,7 +31,14 @@ export function setUniforms(
   if (locations.iDate) {
     const now = new Date()
     const seconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds() + now.getMilliseconds() / 1000
-    gl.uniform4f(locations.iDate, now.getFullYear(), now.getMonth(), now.getDate(), seconds)
+    gl.uniform4f(locations.iDate, now.getFullYear(), now.getMonth() + 1, now.getDate(), seconds)
+  }
+
+  if (locations.iChannelTime) {
+    gl.uniform1fv(locations.iChannelTime, [time, time, time, time])
+  }
+  if (locations.iSampleRate) {
+    gl.uniform1f(locations.iSampleRate, 44100.0)
   }
 }
 

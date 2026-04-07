@@ -7,7 +7,7 @@ export type TextureSource =
   | HTMLVideoElement
   | HTMLCanvasElement
 
-export type TextureWrap = 'clamp' | 'repeat'
+export type TextureWrap = 'clamp' | 'repeat' | 'mirror'
 export type TextureFilter = 'nearest' | 'linear' | 'mipmap'
 
 /** Advanced texture options with wrap/filter/vflip control */
@@ -246,6 +246,8 @@ export interface UniformLocations {
   iDate: WebGLUniformLocation | null
   iChannel: (WebGLUniformLocation | null)[]
   iChannelResolution: WebGLUniformLocation | null
+  iChannelTime: WebGLUniformLocation | null
+  iSampleRate: WebGLUniformLocation | null
 }
 
 export interface RendererState {

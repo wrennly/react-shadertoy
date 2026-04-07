@@ -39,7 +39,7 @@ function applyTextureParameters(
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, vflip ? 1 : 0)
 
   // Wrap
-  const wrapMode = wrap === 'repeat' ? gl.REPEAT : gl.CLAMP_TO_EDGE
+  const wrapMode = wrap === 'repeat' ? gl.REPEAT : wrap === 'mirror' ? gl.MIRRORED_REPEAT : gl.CLAMP_TO_EDGE
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapMode)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapMode)
 

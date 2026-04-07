@@ -45,6 +45,7 @@ export async function fetchShader(id: string, apiKey: string): Promise<Shadertoy
 
 function mapWrap(wrap: string): TextureWrap {
   if (wrap === 'repeat') return 'repeat'
+  if (wrap === 'mirror') return 'mirror'
   return 'clamp'
 }
 

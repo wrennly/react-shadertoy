@@ -33,9 +33,16 @@ uniform sampler2D iChannel1;
 uniform sampler2D iChannel2;
 uniform sampler2D iChannel3;
 uniform vec3  iChannelResolution[4];
+uniform float iChannelTime[4];
+uniform float iSampleRate;
 
-// Shadertoy compat: older shaders may use texture2D()
+// Shadertoy compat: older shaders may use texture2D() etc.
 #define texture2D texture
+#define texture2DLod textureLod
+#define texture2DLodEXT textureLod
+#define texture2DGrad textureGrad
+#define texture2DGradEXT textureGrad
+#define textureCube texture
 
 // Shadertoy built-in defines
 #define HW_PERFORMANCE 1
@@ -142,6 +149,8 @@ export function getUniformLocations(gl: WebGL2RenderingContext, program: WebGLPr
       gl.getUniformLocation(program, 'iChannel3'),
     ],
     iChannelResolution: gl.getUniformLocation(program, 'iChannelResolution'),
+    iChannelTime: gl.getUniformLocation(program, 'iChannelTime'),
+    iSampleRate: gl.getUniformLocation(program, 'iSampleRate'),
   }
 }
 
