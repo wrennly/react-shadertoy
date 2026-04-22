@@ -1,17 +1,27 @@
 # react-shadertoy
 
-Run [Shadertoy](https://www.shadertoy.com/) GLSL shaders in React. Drop a `.glsl` file and it just works.
+[![npm version](https://img.shields.io/npm/v/react-shadertoy.svg?style=flat-square)](https://www.npmjs.com/package/react-shadertoy)
+[![npm downloads](https://img.shields.io/npm/dm/react-shadertoy.svg?style=flat-square)](https://www.npmjs.com/package/react-shadertoy)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/react-shadertoy?style=flat-square)](https://bundlephobia.com/package/react-shadertoy)
+[![types](https://img.shields.io/npm/types/react-shadertoy?style=flat-square)](https://www.npmjs.com/package/react-shadertoy)
+[![license](https://img.shields.io/github/license/wrennly/react-shadertoy?style=flat-square)](./LICENSE)
+
+> Run [Shadertoy](https://www.shadertoy.com/) GLSL shaders in React. Drop a `.glsl` file and it just works.
 
 - **File-based** — point to a `.glsl` file, swap shaders by swapping files
-- Zero dependencies (just React)
-- WebGL2 (GLSL ES 3.0) — full Shadertoy compatibility
-- All uniforms: `iTime`, `iResolution`, `iMouse`, `iDate`, `iFrame`, etc.
-- iChannel0-3 textures (image URL, video, canvas, with wrap/filter/vflip)
-- **RGBA32F** multipass rendering (Buffer A-D with ping-pong FBO, float precision matching Shadertoy)
-- Auto self-feedback — buffer passes read their own previous frame by default
-- Shadertoy API integration (`<Shadertoy id="MdX3zr" />`)
-- Mouse & touch interaction built-in
-- TypeScript-first
+- **Zero dependencies** (just React)
+- **WebGL2** (GLSL ES 3.0) — full Shadertoy compatibility
+- **All uniforms** — `iTime`, `iResolution`, `iMouse`, `iDate`, `iFrame`, etc.
+- **iChannel0-3** textures (image URL, video, canvas, with wrap/filter/vflip)
+- **RGBA32F multipass** — Buffer A-D with ping-pong FBO, float precision matching Shadertoy
+- **Auto self-feedback** — buffer passes read their own previous frame by default
+- **Shadertoy API integration** — `<Shadertoy id="MdX3zr" />`
+- **Mouse & touch** interaction built-in
+- **TypeScript-first**
+
+## Why raw GLSL?
+
+AI coding assistants generate raw GLSL far more reliably than framework-specific shader APIs. GLSL is a standard with massive training data — no abstraction layers to get wrong. Ask any AI to *"write a Shadertoy shader that does X"* and paste the result directly into `fragmentShader`. It just works.
 
 ## Install
 
@@ -110,7 +120,6 @@ Buffer A-D with RGBA32F precision and automatic self-feedback:
 Buffer passes automatically read their own previous frame via `iChannel0` (Shadertoy default behavior). Override by explicitly setting `iChannel0` to something else.
 
 Multipass uses **RGBA32F** textures (with RGBA16F/RGBA8 fallback), matching Shadertoy's float precision for fluid simulations, reaction-diffusion, and physics shaders.
-```
 
 ## Shadertoy API
 
@@ -192,10 +201,24 @@ function MyShader() {
 | `iChannel0-3` | `sampler2D` | Texture inputs |
 | `iChannelResolution` | `vec3[4]` | Texture dimensions |
 
-## Why Raw GLSL?
+## Used by
 
-AI coding assistants generate raw GLSL far more reliably than framework-specific shader APIs. GLSL is a standard with massive training data — no abstraction layers to get wrong. Ask any AI to "write a Shadertoy shader that does X" and paste the result directly into `fragmentShader`. It just works.
+- [@shabon/fx](https://github.com/wrennly/shabon-fx) — 24 background effects for React
+
+## Contributing
+
+Issues and PRs welcome.
+
+- **Bug report** — include a minimal reproduction, browser, OS, and GPU info (`chrome://gpu`)
+- **Shader that should work but doesn't** — include the Shadertoy ID or GLSL source
+- **Feature request** — tell me the use case
 
 ## License
 
-MIT
+MIT. See [LICENSE](./LICENSE).
+
+## Links
+
+- [npm](https://www.npmjs.com/package/react-shadertoy) — package
+- [@shabon/fx](https://github.com/wrennly/shabon-fx) — effects library built on this
+- [@wrennly_dev](https://x.com/wrennly_dev) — updates
